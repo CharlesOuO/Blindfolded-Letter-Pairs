@@ -3,120 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>盲解雙字詞庫練習</title>
+    <title>盲解詞庫練習 (動態版)</title>
     <style>
+        :root {
+            --primary-color: #2196f3;
+            --primary-hover: #1976d2;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --card-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            --card-hover-shadow: 0 10px 20px rgba(33, 150, 243, 0.1);
+        }
+
         body {
-            font-family: "Microsoft JhengHei", sans-serif;
-            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            transition: background-color 0.3s;
         }
 
-        /* 頂部導航 */
+        /* --- 頂部導航 (加入底部滑動線條感) --- */
         .nav-bar {
             background: white;
             width: 100%;
-            padding: 1rem 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            padding: 0;
+            border-bottom: 1px solid var(--border-color);
             text-align: center;
             position: sticky;
             top: 0;
             z-index: 100;
+            display: flex;
+            justify-content: center;
+        }
+
+        .nav-container {
+            display: flex;
+            gap: 20px;
+            padding: 0 20px;
         }
 
         .nav-btn {
-            padding: 10px 25px;
-            font-size: 1rem;
-            border: 2px solid #2196f3;
-            background: white;
-            color: #2196f3;
-            border-radius: 20px;
+            padding: 15px 10px;
+            font-size: 0.95rem;
+            border: none;
+            background: transparent;
+            color: #666;
             cursor: pointer;
-            margin: 0 10px;
-            font-weight: bold;
-            transition: all 0.2s;
+            position: relative;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--primary-color);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            transform-origin: center;
+        }
+
+        .nav-btn:hover {
+            color: var(--primary-color);
         }
 
         .nav-btn.active {
-            background: #2196f3;
-            color: white;
+            color: var(--primary-color);
+        }
+
+        .nav-btn.active::after {
+            transform: scaleX(1);
         }
 
         .container {
             max-width: 600px;
             width: 95%;
-            margin-top: 20px;
+            margin-top: 40px;
             padding-bottom: 50px;
+            /* 頁面切換時的淡入動畫 */
+            animation: fadeInPage 0.5s ease;
         }
 
-        /* --- 列表/背誦模式樣式 --- */
-        .list-controls {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        h1 {
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            font-weight: 300;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            color: #444;
+        }
+
+        /* --- 按鈕動態 --- */
+        button {
+            cursor: pointer;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .action-btn {
+            padding: 10px 25px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            margin: 5px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .action-btn:hover {
+            background: #f0f7ff;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 主要按鈕 (漸層與光澤) */
+        .btn-primary {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 6px 15px rgba(33, 150, 243, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 5px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-danger {
+            color: #d32f2f;
+            border-color: #ffcdd2;
+        }
+        .btn-danger:hover {
+            background-color: #ffebee;
+            color: #b71c1c;
+            border-color: #d32f2f;
+        }
+
+        /* --- 控制面板 --- */
+        .control-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid white;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 25px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .control-panel:hover {
+            box-shadow: 0 8px 15px rgba(0,0,0,0.05);
         }
 
         select {
-            padding: 10px;
-            font-size: 1.2rem;
+            padding: 10px 15px;
+            font-size: 1rem;
             width: 100%;
             max-width: 300px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: #fff;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            cursor: pointer;
         }
 
+        select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+            outline: none;
+        }
+
+        /* --- 列表網格 --- */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
             gap: 15px;
         }
 
         .pair-item {
             background: white;
-            padding: 10px;
+            padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid transparent;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
             display: flex;
             flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .pair-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border-color: #e3f2fd;
         }
 
         .pair-label {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #555;
-            margin-bottom: 5px;
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 8px;
             text-align: center;
+            font-weight: 500;
         }
 
         .pair-input {
-            padding: 5px;
-            font-size: 1.1rem;
-            border: 1px solid #ddd;
+            padding: 8px;
+            font-size: 1rem;
+            border: 1px solid #eee;
             border-radius: 4px;
             text-align: center;
             width: 90%;
             align-self: center;
+            background: #fafafa;
+            transition: all 0.3s ease;
         }
 
         .pair-input:focus {
-            border-color: #2196f3;
+            border-color: var(--primary-color);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15); /* 藍色光暈 */
             outline: none;
-            background: #e3f2fd;
         }
 
-        /* --- 記憶模式樣式 (沿用舊版) --- */
+        /* --- 記憶卡片 (動態核心) --- */
         .card-area {
             background: white;
-            border: 2px solid #2196f3;
-            border-radius: 10px;
-            padding: 40px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 60px 20px;
             margin: 20px 0;
             text-align: center;
             cursor: pointer;
@@ -124,48 +260,123 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            
+            /* 動態轉場 */
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         }
 
-        .question { font-size: 5rem; font-weight: bold; color: #1565c0; }
-        .answer { font-size: 2.5rem; color: #d32f2f; margin-top: 20px; font-weight: bold; display: none; }
-        .answer.show { display: block; }
-        .hint { color: #999; margin-top: 15px; font-size: 0.9rem; }
+        .card-area:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-5px) scale(1.01);
+            box-shadow: var(--card-hover-shadow);
+        }
 
-        .memory-controls { text-align: center; }
-        .btn-primary {
-            padding: 12px 30px;
-            font-size: 1.2rem;
-            background-color: #2196f3;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);
+        .card-area:active {
+            transform: scale(0.98);
+        }
+
+        .question { 
+            font-size: 5rem; 
+            font-weight: 300; 
+            color: #333; 
+            letter-spacing: 2px;
+            transition: color 0.3s;
+        }
+        
+        .card-area:hover .question {
+            color: var(--primary-color);
+        }
+
+        .answer { 
+            font-size: 2.2rem; 
+            color: #d32f2f; 
+            margin-top: 25px; 
+            font-weight: 500; 
+            opacity: 0;
+            transform: translateY(20px);
+            display: none;
+        }
+
+        /* 答案顯示動畫 */
+        .answer.show { 
+            display: block;
+            animation: fadeInUp 0.4s forwards ease-out;
+        }
+
+        .hint { 
+            color: #aaa; 
+            margin-top: 30px; 
+            font-size: 0.85rem; 
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        
+        .card-area:hover .hint {
+            opacity: 1;
+        }
+
+        /* 訊息框 */
+        .alert-box {
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 0.95rem;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+        .alert-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .alert-error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+
+        .helper-text {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 10px;
+            line-height: 1.6;
         }
 
         /* 隱藏/顯示控制 */
         .view-section { display: none; }
         .view-section.active { display: block; }
 
+        /* --- 動畫關鍵影格 --- */
+        @keyframes fadeInPage {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
     </style>
 </head>
 <body>
 
     <div class="nav-bar">
-        <button class="nav-btn active" onclick="switchTab('list')">📝 列表背誦/輸入</button>
-        <button class="nav-btn" onclick="switchTab('memory')">🧠 隨機記憶</button>
+        <div class="nav-container">
+            <button class="nav-btn active" onclick="switchTab('list')">列表輸入</button>
+            <button class="nav-btn" onclick="switchTab('memory')">記憶測驗</button>
+            <button class="nav-btn" onclick="switchTab('data')">資料備份</button>
+        </div>
     </div>
 
     <div class="container">
-
         <div id="view-list" class="view-section active">
-            <div class="list-controls">
-                <label style="display:block; margin-bottom:5px; color:#666;">選擇開頭注音：</label>
+            <div class="control-panel">
+                <label style="display:block; margin-bottom:10px; color:#555; font-size:0.95rem; font-weight:500;">開頭注音</label>
                 <select id="char-select" onchange="renderList()">
                     </select>
-                <p style="font-size:0.9rem; color:#888; margin-top:10px;">
-                    💡 提示：輸入完直接按 Enter 會跳到下一格。
+                <p class="helper-text">
+                    輸入完後按 <strong>Enter</strong> 鍵自動跳至下一格。<br>
+                    系統會即時儲存您的變更。
                 </p>
             </div>
 
@@ -174,25 +385,53 @@
         </div>
 
         <div id="view-memory" class="view-section">
-            <div class="list-controls">
-                <label style="color:#666;">範圍設定：</label>
-                <select id="memory-range" onchange="nextCard()">
-                    <option value="all">全範圍隨機 (All)</option>
+            <div class="control-panel">
+                <label style="color:#555; margin-right:15px; font-weight:500;">測驗範圍</label>
+                <select id="memory-range" onchange="nextCard()" style="max-width:200px;">
+                    <option value="all">全範圍隨機</option>
                     </select>
             </div>
 
             <div class="card-area" onclick="toggleAnswer()">
                 <div class="question" id="q-text">?</div>
                 <div class="answer" id="a-text">...</div>
-                <div class="hint" id="hint-text">(點擊翻牌看答案)</div>
+                <div class="hint" id="hint-text">點擊卡片翻牌</div>
             </div>
 
-            <div class="memory-controls">
+            <div style="text-align:center;">
                 <button class="btn-primary" onclick="nextCard()">下一題 (Space)</button>
             </div>
-            
-            <div style="text-align:center; margin-top:20px; color:#888; font-size:0.9rem;">
-                如果在記憶模式發現詞想改，請切回「列表模式」修改。
+        </div>
+
+        <div id="view-data" class="view-section">
+            <div class="control-panel">
+                <h3 style="margin-top:0; font-weight:400; color:#444;">資料轉移與備份</h3>
+                
+                <div style="margin: 40px 0;">
+                    <button class="action-btn" onclick="exportData()">
+                        下載備份 (.json)
+                    </button>
+                    <p class="helper-text">將目前的詞庫下載到電腦或手機中保存。</p>
+                </div>
+
+                <hr style="margin:30px 0; border:0; border-top:1px solid #f0f0f0;">
+
+                <div style="margin: 40px 0;">
+                    <div style="margin-bottom:20px;">
+                        <input type="file" id="file-input" accept=".json" style="padding:10px; background:#f9f9f9; border-radius:6px;">
+                    </div>
+                    <button class="action-btn" style="border-color:#4caf50; color:#2e7d32;" onclick="importData()">
+                        讀取並還原
+                    </button>
+                    <div id="import-msg" class="alert-box"></div>
+                    <p class="helper-text">選擇之前備份的 .json 檔案來還原資料。</p>
+                </div>
+                
+                <hr style="margin:30px 0; border:0; border-top:1px solid #f0f0f0;">
+                
+                <div style="text-align:right;">
+                     <button class="action-btn btn-danger" onclick="clearAllData()">清空所有資料</button>
+                </div>
             </div>
         </div>
 
@@ -201,17 +440,13 @@
     <script>
         // --- 1. 定義注音列表 (24字) ---
         const chars = [
-            'ㄅ','ㄆ','ㄇ','ㄈ',
-            'ㄉ','ㄊ','ㄋ','ㄌ',
-            'ㄍ','ㄎ','ㄏ',
-            'ㄐ','ㄑ','ㄒ',
-            'ㄓ','ㄔ','ㄕ','ㄖ',
-            'ㄗ','ㄘ','ㄙ',
+            'ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ',
+            'ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ',
+            'ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ',
             'ㄧ','ㄨ','ㄩ'
         ];
 
         // --- 2. 資料存取 (使用 LocalStorage) ---
-        // 格式: { "ㄅㄇ": "斑馬", "ㄩㄙ": "雨傘" ... }
         const STORAGE_KEY = 'bld_custom_dict_v3';
         
         function getDict() {
@@ -229,47 +464,46 @@
         }
 
         // --- 3. 介面初始化 ---
-        
         function init() {
-            // 填入下拉選單 (列表模式)
             const listSelect = document.getElementById('char-select');
-            // 填入下拉選單 (記憶模式)
             const memSelect = document.getElementById('memory-range');
 
             chars.forEach(c => {
-                // List Mode Select
+                // List Mode
                 let opt1 = document.createElement('option');
                 opt1.value = c;
-                opt1.innerText = `${c} 開頭 (例如 ${c}X)`;
+                opt1.innerText = `${c} 開頭`;
                 listSelect.appendChild(opt1);
 
-                // Memory Mode Select
+                // Memory Mode
                 let opt2 = document.createElement('option');
                 opt2.value = c;
                 opt2.innerText = `只練 ${c} 開頭`;
                 memSelect.appendChild(opt2);
             });
 
-            // 預設渲染列表
+            // 點擊檔案選擇時隱藏訊息
+            document.getElementById('file-input').addEventListener('click', function() {
+                document.getElementById('import-msg').style.display = 'none';
+            });
+
             renderList();
         }
 
         // --- 4. 列表模式邏輯 ---
-
         function renderList() {
             const startChar = document.getElementById('char-select').value;
             const container = document.getElementById('grid-area');
             const dict = getDict();
 
-            container.innerHTML = ''; // 清空
+            container.innerHTML = ''; 
 
-            chars.forEach((endChar, index) => {
-                if (startChar === endChar) return; // 跳過重複 (如 ㄅㄅ)
+            chars.forEach((endChar) => {
+                if (startChar === endChar) return; 
 
                 const pair = startChar + endChar;
-                const savedWord = dict[pair] || ""; // 如果沒存過就是空字串
+                const savedWord = dict[pair] || "";
 
-                // 建立卡片 HTML
                 const div = document.createElement('div');
                 div.className = 'pair-item';
                 
@@ -281,22 +515,18 @@
                 input.className = 'pair-input';
                 input.type = 'text';
                 input.value = savedWord;
-                input.placeholder = "輸入詞...";
-                input.dataset.pair = pair; // 綁定 key
+                input.dataset.pair = pair;
                 
-                // 事件：輸入時自動儲存
+                // 輸入時儲存
                 input.addEventListener('input', function() {
                     saveWord(this.dataset.pair, this.value);
                 });
 
-                // 事件：按 Enter 跳下一格
+                // Enter 跳下一格
                 input.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        // 找下一個 input
                         const allInputs = document.querySelectorAll('.pair-input');
-                        // 這裡因為我們是在 loop 裡建立的，DOM順序就是顯示順序
-                        // 找出目前 input 在 NodeList 的 index
                         for(let i=0; i<allInputs.length; i++) {
                             if(allInputs[i] === this) {
                                 if(i + 1 < allInputs.length) {
@@ -315,7 +545,6 @@
         }
 
         // --- 5. 記憶模式邏輯 ---
-        
         let currentPair = "";
         let isAnswerShown = false;
 
@@ -336,10 +565,9 @@
 
             currentPair = c1 + c2;
 
-            // UI Reset
             document.getElementById('q-text').innerText = currentPair;
             document.getElementById('a-text').classList.remove('show');
-            document.getElementById('hint-text').innerText = "(點擊翻牌)";
+            document.getElementById('hint-text').innerText = "點擊卡片翻牌";
             isAnswerShown = false;
         }
 
@@ -348,58 +576,115 @@
 
             const dict = getDict();
             const word = dict[currentPair];
-
             const answerEl = document.getElementById('a-text');
             
             if (word) {
                 answerEl.innerText = word;
                 answerEl.style.color = "#d32f2f";
             } else {
-                answerEl.innerText = "(尚未定義)";
+                answerEl.innerText = "尚未定義";
                 answerEl.style.color = "#999";
             }
 
             answerEl.classList.add('show');
-            document.getElementById('hint-text').innerText = "(按 Space 下一題)";
+            document.getElementById('hint-text').innerText = "按 Space 下一題";
             isAnswerShown = true;
         }
 
-        // --- 6. 通用控制 ---
+        // --- 6. 備份功能 ---
+        function exportData() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            if (!data || data === '{}') {
+                alert("目前沒有資料可以備份。");
+                return;
+            }
+            const blob = new Blob([data], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bld_dict_backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
 
-        function switchTab(mode) {
-            // 切換按鈕樣式
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+        function importData() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            const msgBox = document.getElementById('import-msg');
 
-            // 切換顯示區塊
-            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
-            
-            if (mode === 'list') {
-                document.getElementById('view-list').classList.add('active');
-                renderList(); // 重新渲染以確保資料最新
-            } else {
-                document.getElementById('view-memory').classList.add('active');
-                nextCard(); // 進入記憶模式自動出題
+            msgBox.className = 'alert-box'; // 重置樣式
+
+            if (!file) {
+                alert("請先選擇一個 .json 檔案");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if (typeof json === 'object') {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+                        msgBox.classList.add('alert-success');
+                        msgBox.innerText = "匯入成功！您可以開始練習了。";
+                        msgBox.style.display = 'block';
+                        renderList(); // 更新列表顯示
+                    } else {
+                        throw new Error("格式錯誤");
+                    }
+                } catch (err) {
+                    msgBox.classList.add('alert-error');
+                    msgBox.innerText = "檔案格式錯誤，請確認這是之前備份的 .json 檔。";
+                    msgBox.style.display = 'block';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            if(confirm("確定要清空所有資料嗎？此動作無法復原。")) {
+                localStorage.removeItem(STORAGE_KEY);
+                renderList();
+                alert("資料已清空。");
             }
         }
 
-        // 鍵盤 Space 控制 (僅在記憶模式有效)
+        // --- 7. 通用控制 ---
+        function switchTab(mode) {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // 這裡簡單根據 index 判斷
+            if(mode === 'list') document.querySelectorAll('.nav-btn')[0].classList.add('active');
+            if(mode === 'memory') document.querySelectorAll('.nav-btn')[1].classList.add('active');
+            if(mode === 'data') document.querySelectorAll('.nav-btn')[2].classList.add('active');
+
+            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
+            
+            // 加入淡入動畫
+            const activeView = document.getElementById('view-' + mode);
+            activeView.classList.add('active');
+            activeView.style.animation = 'fadeInPage 0.5s ease';
+            
+            if (mode === 'list') renderList();
+            if (mode === 'memory') nextCard();
+        }
+
+        // 鍵盤 Space 控制
         document.addEventListener('keydown', function(event) {
             const memoryView = document.getElementById('view-memory');
-            // 只有當記憶模式顯示中，才啟用 Space
             if (memoryView.classList.contains('active')) {
                 if (event.code === 'Space') {
                     event.preventDefault();
-                    if (!isAnswerShown) {
-                        toggleAnswer();
-                    } else {
-                        nextCard();
+                    if (document.activeElement.tagName !== 'BUTTON') {
+                        if (!isAnswerShown) toggleAnswer();
+                        else nextCard();
                     }
                 }
             }
         });
 
-        // 啟動
         init();
 
     </script>
