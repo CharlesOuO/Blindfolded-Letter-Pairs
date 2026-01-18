@@ -666,37 +666,77 @@
         function startTestQuestion() { 
             const dict = getDict(); 
             const statusMap = getStatus(); 
-            const valid = Object.keys(dict).filter(k => dict[k]); 
+            const valid = Object.keys(dict).filter(k => dict[k]); // 有資料的題目
+            
             if(valid.length === 0) return alert(t('alert_no_data')); 
+            
             const selectedChars = getSelectedRanges('test'); 
             if(selectedChars.length === 0) return alert(t('alert_sel_range')); 
+            
+            // 1. 篩選出符合範圍的題目
             let candidates = valid.filter(p => selectedChars.includes(p[0])); 
             if(candidates.length === 0) return alert(t('alert_no_data')); 
-            let pool = candidates; if (candidates.length > 1 && lastTestPair) { 
+
+            // 避免連續出現同一題 (除非只有一題)
+            let pool = candidates; 
+            if (candidates.length > 1 && lastTestPair) { 
                 pool = candidates.filter(p => p !== lastTestPair); 
             } 
-            let urgent = []; 
-            let review = []; 
-            let mastered = []; 
-            pool.forEach(p => { const s = statusMap[p]; 
-                if (!s || s === 'red') urgent.push(p); 
-                else if (s === 'yellow') review.push(p); 
-                else if (s === 'green') mastered.push(p); }); 
-                let targetGroup = urgent.length > 0 ? urgent : (review.length > 0 ? review : mastered); 
-                if(targetGroup.length===0) targetGroup=pool; 
-                currentPair = targetGroup[Math.floor(Math.random() * targetGroup.length)]; 
-                lastTestPair = currentPair; document.getElementById('test-q').innerText = currentPair; 
-                const inp = document.getElementById('test-input'); 
-                inp.value = ''; 
-                inp.disabled = false; inp.focus(); 
-                document.getElementById('test-feedback').innerText = ''; 
-                document.getElementById('test-correct-msg').innerText = ''; 
-                isWaitingTestNext = false; applyLanguage(); 
-                if(timerInterval) clearInterval(timerInterval); 
-                testStartTime = Date.now(); 
-                document.getElementById('timer').innerText = "0.0s"; 
-                timerInterval = setInterval(() => { document.getElementById('timer').innerText = ((Date.now() - testStartTime) / 1000).toFixed(1) + "s"; }, 100); 
+
+            // 2. 分類
+            let untested = []; // 沒測過
+            let learning = []; // 不熟 (紅/黃)
+            let mastered = []; // 熟悉 (綠)
+
+            pool.forEach(p => { 
+                const s = statusMap[p]; 
+                if (!s) untested.push(p);          // 無狀態
+                else if (s === 'green') mastered.push(p); // 綠色
+                else learning.push(p);             // 紅色或黃色
+            }); 
+
+            // 3. 加權隨機選擇 (權重可在此調整)
+            let targetGroup = [];
+            const rand = Math.random();
+
+            // 邏輯：
+            // 如果還有「未測驗」，70% 機率選未測驗，20% 選不熟，10% 選熟悉。
+            // 如果「未測驗」沒了，則 80% 選不熟，20% 選熟悉。
+            // 如果只剩其中一類，就直接選那一類。
+
+            if (untested.length > 0) {
+                if (rand < 0.7) targetGroup = untested;       // 70% 新題目
+                else if (rand < 0.9) targetGroup = (learning.length > 0) ? learning : untested; // 20% 複習錯的
+                else targetGroup = (mastered.length > 0) ? mastered : ((learning.length > 0) ? learning : untested); // 10% 複習熟的
+            } else if (learning.length > 0) {
+                if (rand < 0.8) targetGroup = learning;       // 80% 複習錯的
+                else targetGroup = (mastered.length > 0) ? mastered : learning; // 20% 複習熟的
+            } else {
+                targetGroup = mastered; // 只剩熟的，就練熟的
             }
+
+            // 4. 出題
+            currentPair = targetGroup[Math.floor(Math.random() * targetGroup.length)]; 
+            lastTestPair = currentPair; 
+            
+            document.getElementById('test-q').innerText = currentPair; 
+            const inp = document.getElementById('test-input'); 
+            inp.value = ''; 
+            inp.disabled = false; 
+            inp.focus(); 
+            
+            document.getElementById('test-feedback').innerText = ''; 
+            document.getElementById('test-correct-msg').innerText = ''; 
+            isWaitingTestNext = false; 
+            applyLanguage(); 
+            
+            if(timerInterval) clearInterval(timerInterval); 
+            testStartTime = Date.now(); 
+            document.getElementById('timer').innerText = "0.0s"; 
+            timerInterval = setInterval(() => { 
+                document.getElementById('timer').innerText = ((Date.now() - testStartTime) / 1000).toFixed(1) + "s"; 
+            }, 100); 
+        }
         function checkTestAnswer() { 
             if(isWaitingTestNext) return; 
             clearInterval(timerInterval); 
