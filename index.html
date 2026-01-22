@@ -3,253 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Letter Pairs Practice (Responsive & Fixed)</title>
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --bg-body: #f8fafc;
-            --text-main: #0f172a;
-            --text-sub: #64748b;
-            
-            --status-green: #dcfce7; --status-green-border: #86efac;
-            --status-yellow: #fef9c3; --status-yellow-border: #fde047;
-            --status-red: #fee2e2;    --status-red-border: #fca5a5;
-            
-            --guide-highlight: #e0f2fe; 
-            --guide-highlight-border: #7dd3fc;
-
-            /* 電腦版預設尺寸 */
-            --cell-width: 44px;
-            --cell-height: 38px;
-            --header-height: 60px;
-        }
-
-        /* 英文模式：寬格子 */
-        body.mode-en { --cell-width: 68px; }
-        /* 中文模式：緊湊格子 */
-        body.mode-zh { --cell-width: 44px; }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            margin: 0; padding: 0;
-            display: flex; flex-direction: column; min-height: 100vh;
-        }
-
-        /* --- Navigation --- */
-        .nav-bar {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            width: 100%; height: var(--header-height);
-            border-bottom: 1px solid #e2e8f0;
-            position: sticky; top: 0; z-index: 100;
-            display: flex; justify-content: center;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .nav-container {
-            display: flex; gap: 4px; padding: 0 8px; 
-            overflow-x: auto; /* 手機版導覽列可滑動 */
-            width: 100%; max-width: 900px; align-items: center; justify-content: center;
-            scrollbar-width: none; /* Firefox 隱藏捲軸 */
-        }
-        .nav-container::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
-        
-        .nav-btn {
-            padding: 8px 16px; font-size: 0.95rem; border: none; background: transparent;
-            color: var(--text-sub); cursor: pointer; font-weight: 600; border-radius: 6px;
-            white-space: nowrap; transition: all 0.2s; flex-shrink: 0;
-        }
-        .nav-btn.active { color: var(--primary-color); background-color: #eff6ff; }
-        .nav-btn:hover { background-color: #f1f5f9; color: var(--primary-color); }
-
-        /* --- Layout Container --- */
-        .container {
-            /* 預設窄版 (列表模式) */
-            max-width: 800px; 
-            width: 95%; 
-            margin: 20px auto 40px auto; 
-            flex: 1; 
-            transition: max-width 0.3s ease;
-        }
-        
-        /* 寬版模式 (Matrix) */
-        .container.wide-mode {
-            max-width: 100%; 
-            width: 100%;
-            padding: 0 16px;
-        }
-
-        /* --- Buttons --- */
-        .action-btn {
-            padding: 8px 14px; border-radius: 8px; border: 1px solid #cbd5e1;
-            background: white; color: var(--text-main); font-size: 0.9rem; font-weight: 500;
-            margin: 4px; cursor: pointer; transition: all 0.2s;
-            display: inline-flex; align-items: center; justify-content: center;
-        }
-        .action-btn:active { transform: scale(0.98); }
-        .action-btn:hover { border-color: var(--primary-color); color: var(--primary-color); background-color: #eff6ff; }
-        
-        .btn-primary {
-            background: var(--primary-color); color: white; border: none;
-            padding: 12px 32px; font-size: 1rem; border-radius: 99px; cursor: pointer;
-            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;
-            font-weight: 600;
-        }
-        .btn-primary:active { transform: scale(0.96); }
-        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
-        
-        .btn-danger { color: #dc2626; border-color: #fca5a5; background: #fff; }
-        .btn-danger:hover { background: #fef2f2; border-color: #dc2626; }
-        
-        .btn-sm { padding: 4px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; margin-left: 4px; cursor: pointer; }
-        .btn-sm:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-        /* --- Matrix Table --- */
-        .matrix-wrapper { 
-            overflow: auto; 
-            max-height: 75vh; 
-            border: 1px solid #cbd5e1; 
-            border-radius: 8px; 
-            background: white; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            position: relative;
-            padding-right: 2px;
-            
-            /* --- 關鍵修改：解決右邊留白並維持手機版正常 --- */
-            width: fit-content; 
-            max-width: 100%; 
-            margin: 0 auto;
-        }
-
-        .matrix-table { 
-            border-collapse: separate; 
-            border-spacing: 0; 
-            width: max-content; 
-            table-layout: fixed;
-            margin-bottom: 2px;
-        }
-        
-        .matrix-table th, .matrix-table td { 
-            padding: 0;
-            border-right: 1px solid #e2e8f0; 
-            border-bottom: 1px solid #e2e8f0; 
-            text-align: center; 
-            width: var(--cell-width); 
-            min-width: var(--cell-width); 
-            max-width: var(--cell-width);
-            height: var(--cell-height);
-            overflow: hidden; white-space: nowrap;
-            background: #fff; transition: background-color 0.1s;
-        }
-
-        /* Sticky Headers */
-        .matrix-table thead th { position: sticky; top: 0; z-index: 10; background: #f1f5f9; color: #334155; font-weight: bold; border-bottom: 2px solid #cbd5e1; }
-        .matrix-table tbody th { position: sticky; left: 0; z-index: 5; background: #f1f5f9; font-weight: bold; border-right: 2px solid #cbd5e1; }
-        .matrix-table thead th:first-child { position: sticky; left: 0; top: 0; z-index: 20; background: #e2e8f0; border-right: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
-
-        /* Inputs */
-        .matrix-input { width: 100%; height: 100%; border: none; outline: none; background: transparent; text-align: center; font-size: 13px; color: #0f172a; padding: 0 2px; display: block; border-radius: 0; }
-        .matrix-input:focus { background: rgba(255,255,255,0.9); box-shadow: inset 0 0 0 2px var(--primary-color); font-weight: 600; }
-        .header-input { width: 100%; background: transparent; border: none; text-align: center; font-weight: 700; color: #334155; cursor: pointer; outline: none; font-size: 0.85rem; padding: 0; border-radius: 0; }
-        
-        .diagonal-wrapper { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
-        .diagonal-wrapper .matrix-input { height: 60%; font-size: 12px; }
-        .btn-diagonal-check { height: 40%; width: 100%; font-size: 10px; padding: 0; margin: 0; border: none; border-top: 1px solid #e2e8f0; background: #f8fafc; color: var(--primary-color); cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center; }
-        .btn-diagonal-check:hover { background: var(--primary-color); color: white; }
-
-        /* Highlight & Status */
-        .status-green { background-color: var(--status-green) !important; }
-        .status-yellow { background-color: var(--status-yellow) !important; }
-        .status-red { background-color: var(--status-red) !important; }
-        .highlight-guide { background-color: var(--guide-highlight) !important; }
-        .highlight-guide.status-green { background-color: #bbf7d0 !important; }
-        .highlight-guide.status-yellow { background-color: #fef08a !important; }
-        .highlight-guide.status-red { background-color: #fecaca !important; }
-        th.highlight-guide { background-color: #cbd5e1 !important; color: #1e3a8a; }
-
-        /* --- Other Views --- */
-        .view-section { display: none; animation: fadeIn 0.3s ease; padding-bottom: 60px; }
-        .view-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .control-panel { background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        
-        /* 響應式 Grid */
-        .grid-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
-            gap: 10px; 
-        }
-        
-        .pair-item { background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; transition: transform 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .pair-item:hover { border-color: var(--primary-color); transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .pair-label { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 4px; font-weight: 500; }
-        .pair-input { width: 100%; padding: 6px; text-align: center; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; -webkit-appearance: none; }
-        .pair-input:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
-        .hidden { display: none !important; }
-
-        .card-area { background: white; padding: 40px; border-radius: 16px; border: 1px solid #e2e8f0; text-align: center; margin: 20px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.03); position: relative; }
-        .question { font-size: 5rem; margin-bottom: 15px; font-weight: 300; line-height: 1; }
-        .answer-text { font-size: 2.5rem; color: #dc2626; display: none; font-weight: 600; margin-top: 10px; }
-        .answer-text.show { display: block; animation: popIn 0.2s; }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-        .dropdown-wrapper { position: relative; display: inline-block; width: 100%; max-width: 300px; }
-        .dropdown-content { display: none; position: absolute; background: white; border: 1px solid #e2e8f0; z-index: 999; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; text-align: left; border-radius: 8px; left: 0; top: 110%; }
-        .dropdown-content.show { display: block; }
-        .checkbox-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 220px; overflow-y: auto; }
-        
-        /* Footer */
-        .main-footer { background: #0f172a; color: #94a3b8; padding: 30px 20px; text-align: center; margin-top: auto; font-size: 0.9rem; }
-        .social-icons { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
-        .icon-link svg { width: 24px; height: 24px; fill: #cbd5e1; transition: 0.2s; }
-        .icon-link:hover svg { fill: white; transform: scale(1.1); }
-
-        /* --- Mobile Responsive Rules (關鍵的手機版調整) --- */
-        @media (max-width: 768px) {
-            :root {
-                --header-height: 52px; /* 縮小導覽列 */
-            }
-            .nav-container { justify-content: flex-start; padding: 0 12px; } /* 導覽列靠左對齊方便滑動 */
-            .nav-btn { padding: 6px 12px; font-size: 0.9rem; }
-            
-            .container { width: 100%; padding: 0 12px; margin: 15px auto; }
-            .container.wide-mode { padding: 0 10px; }
-            
-            .control-panel { padding: 15px; margin-bottom: 15px; }
-            
-            .card-area { padding: 25px 15px; }
-            .question { font-size: 3.5rem; } /* 縮小大標題 */
-            .answer-text { font-size: 2rem; }
-            
-            /* 手機上列表輸入框最小 16px 防止 iOS 縮放 */
-            .pair-input, .matrix-input, #test-input { font-size: 16px; }
-            
-            .grid-container {
-                grid-template-columns: repeat(3, 1fr); /* 強制手機版一排三個 */
-                gap: 8px;
-            }
-            .pair-item { padding: 8px 4px; }
-            .pair-input { padding: 4px; font-size: 16px; border-radius: 4px; }
-            
-            /* 全表模式在手機上微調 */
-            .matrix-wrapper { border-radius: 6px; }
-            
-            /* 調整按鈕大小方便觸控 */
-            .btn-primary { width: 100%; padding: 14px; }
-            .action-btn { padding: 10px 16px; }
-            
-            .dropdown-wrapper { max-width: 100%; }
-            .checkbox-grid { grid-template-columns: repeat(4, 1fr); }
-            
-            /* 修正打字測驗輸入框 */
-            #test-input { width: 100%; max-width: none; }
-        }
-    </style>
+    <title>Letter Pairs Practice</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body onload="init()">
     <div class="nav-bar">
@@ -265,23 +20,29 @@
         
         <div id="view-list" class="view-section active">
             <div class="control-panel">
-                <div style="margin-bottom: 16px;">
+                <div class="control-row" style="margin-bottom: 16px;">
                     <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')" style="border-color:var(--primary-color); color:var(--primary-color);">📋 <span data-i18n="mode_card">列表模式</span></button>
                     <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')">▦ <span data-i18n="mode_matrix">全表模式</span></button>
                 </div>
                 
                 <div id="list-mode-controls">
-                    <label data-i18n="lbl_start_char" style="font-weight:500;">開頭：</label>
-                    <select id="char-select" onchange="renderList()" style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; outline:none; font-size:16px;"></select>
+                    <div class="control-row">
+                        <label data-i18n="lbl_start_char" style="font-weight:500;">開頭：</label>
+                        <select id="char-select" onchange="renderList()" style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; outline:none; font-size:16px; cursor: pointer;"></select>
+                    </div>
                 </div>
                 
-                <div id="matrix-settings" class="hidden" style="margin-top: 10px;">
-                    <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
-                    <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">重置代碼</button>
+                <div id="matrix-settings" class="hidden">
+                    <div class="control-row" style="gap: 15px;">
+                        <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
+                        <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">回復預設</button>
+                    </div>
                 </div>
                 
                 <div style="margin-top: 16px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                    <button class="action-btn" onclick="resetAllColors()" style="font-size: 0.85rem; color: #64748b;" data-i18n="btn_reset_color">🔄 重置所有顏色</button>
+                    <div class="control-row">
+                        <button class="action-btn" onclick="resetAllColors()" style="font-size: 0.85rem; color: #64748b;" data-i18n="btn_reset_color">🔄 重置所有顏色</button>
+                    </div>
                 </div>
             </div>
 
@@ -294,50 +55,69 @@
 
         <div id="view-memory" class="view-section">
             <div class="control-panel">
-                <label data-i18n="lbl_range" style="font-weight:500;">範圍：</label>
-                <div class="dropdown-wrapper">
-                    <button id="mem-dropdown-btn" onclick="toggleDropdown('mem')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                    <div class="dropdown-content" id="mem-dropdown-content">
-                        <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                            <button class="btn-sm" onclick="toggleAll('mem', true)" style="flex:1;">全選</button>
-                            <button class="btn-sm" onclick="toggleAll('mem', false)" style="flex:1;">全消</button>
+                <div class="control-row">
+                    <label data-i18n="lbl_range" style="font-weight:500;">範圍：</label>
+                    <div class="dropdown-wrapper">
+                        <button id="mem-dropdown-btn" onclick="toggleDropdown('mem')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <div class="dropdown-content" id="mem-dropdown-content">
+                            <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                                <button class="btn-sm" onclick="toggleAll('mem', true)" style="flex:1;">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('mem', false)" style="flex:1;">全消</button>
+                            </div>
+                            <div id="mem-range-grid" class="checkbox-grid"></div>
                         </div>
-                        <div id="mem-range-grid" class="checkbox-grid"></div>
                     </div>
                 </div>
             </div>
+
             <div class="card-area" onclick="toggleMemoryAnswer()">
                 <div class="question" id="mem-q">FO</div>
                 <div class="answer-text" id="mem-a">...</div>
-                <div style="margin-top:30px; color:#94a3b8; font-size:0.9rem;" id="mem-hint" data-i18n="hint_click_flip">點擊卡片翻牌</div>
+                
+                <div style="color:#94a3b8; font-size:0.9rem; margin-top:10px; min-height: 20px;" id="mem-hint" data-i18n="hint_click_flip">點擊卡片翻牌</div>
+
+                <div id="mem-grading-area" class="grading-btns hidden">
+                    <button class="grading-btn btn-grade-red" onclick="event.stopPropagation(); markMemStatus('red')">
+                        <span data-i18n="fb_wrong">不熟</span>
+                    </button>
+                    <button class="grading-btn btn-grade-yellow" onclick="event.stopPropagation(); markMemStatus('yellow')">
+                        <span data-i18n="fb_slow">猶豫</span>
+                    </button>
+                    <button class="grading-btn btn-grade-green" onclick="event.stopPropagation(); markMemStatus('green')">
+                        <span data-i18n="fb_good">熟練</span>
+                    </button>
+                </div>
             </div>
+            
             <div style="text-align:center; margin-bottom:20px;">
-                <button class="btn-primary" onclick="nextMemoryCard()" id="btn-next-mem" data-i18n="btn_next">下一題 (Space)</button>
+                <button class="btn-ghost" onclick="nextMemoryCard()" id="btn-next-mem" data-i18n="btn_next">下一題 (Space)</button>
             </div>
         </div>
 
         <div id="view-test" class="view-section">
             <div class="control-panel">
-                <label data-i18n="lbl_test_range" style="font-weight:500;">範圍：</label>
-                <div class="dropdown-wrapper">
-                    <button id="test-dropdown-btn" onclick="toggleDropdown('test')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                    <div class="dropdown-content" id="test-dropdown-content">
-                        <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                            <button class="btn-sm" onclick="toggleAll('test', true)" style="flex:1;">全選</button>
-                            <button class="btn-sm" onclick="toggleAll('test', false)" style="flex:1;">全消</button>
+                <div class="control-row">
+                    <label data-i18n="lbl_test_range" style="font-weight:500;">範圍：</label>
+                    <div class="dropdown-wrapper">
+                        <button id="test-dropdown-btn" onclick="toggleDropdown('test')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <div class="dropdown-content" id="test-dropdown-content">
+                            <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                                <button class="btn-sm" onclick="toggleAll('test', true)" style="flex:1;">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('test', false)" style="flex:1;">全消</button>
+                            </div>
+                            <div id="test-range-grid" class="checkbox-grid"></div>
                         </div>
-                        <div id="test-range-grid" class="checkbox-grid"></div>
                     </div>
                 </div>
             </div>
-            <div class="card-area">
+            <div class="card-area-test">
                 <div id="timer" style="font-family:monospace; font-size:1.5rem; margin-bottom:15px; color:#64748b; background:#f1f5f9; display:inline-block; padding:5px 15px; border-radius:20px;">0.0s</div>
                 <div class="question" id="test-q">?</div>
                 <input type="text" id="test-input" style="padding:12px; text-align:center; margin-top:15px; border:2px solid #e2e8f0; border-radius:8px; outline:none;" autocomplete="off" placeholder="Type here">
                 <div id="test-feedback" style="margin-top:20px; font-weight:bold; min-height:28px; font-size:1.1rem;"></div>
                 <div id="test-correct-msg" style="margin-top:5px; min-height:28px;"></div>
             </div>
-            <div style="text-align:center; margin-bottom:20px;">
+            <div style="text-align:center; margin-bottom:20px; margin-top:20px;">
                 <button class="btn-primary" id="test-btn" onclick="startTestQuestion()" data-i18n="btn_start_test">開始測驗 (Space)</button>
             </div>
         </div>
@@ -346,7 +126,9 @@
             <div class="control-panel">
                 <h3 data-i18n="title_backup" style="margin-top:0;">資料備份</h3>
                 <div style="padding:20px 0;">
-                    <button class="action-btn" onclick="exportData()" data-i18n="btn_export" style="padding:10px 20px;">📥 下載備份 (.json)</button>
+                    <div class="control-row">
+                        <button class="action-btn" onclick="exportData()" data-i18n="btn_export" style="padding:10px 20px;">📥 下載備份 (.json)</button>
+                    </div>
                 </div>
                 <div style="margin-top:10px; border-top:1px solid #eee; padding-top:20px; background:#f9fafb; border-radius:8px;">
                     <label data-i18n="lbl_select_file" style="display:block; margin-bottom:10px; color:#64748b;">匯入檔案：</label>
@@ -372,429 +154,7 @@
         <div style="margin-bottom:8px;">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
         <button onclick="toggleLanguage()" style="background:transparent; border:1px solid #64748b; color:#94a3b8; border-radius:20px; padding:4px 12px; cursor:pointer; font-size:0.8rem; transition:0.2s;">English / 中文</button>
     </footer>
-
-    <script>
-        const CHARS_ZH = ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ'];
-        const CHARS_EN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X'];
-        let chars = [...CHARS_ZH];
-        const STORAGE_KEY = 'bld_custom_dict_v3'; const STATUS_KEY = 'bld_status_v1'; const LANG_KEY = 'bld_lang_v1'; const CHARS_KEY = 'bld_chars_v1';
-        let currentPair = null; let isMemAnswerShown = false; let testStartTime = 0; let isWaitingTestNext = true; let timerInterval = null; let lastMemPair = null; let lastTestPair = null;
-        let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
-        let isMatrixMode = false;
-
-        const translations = {
-            'zh-TW': {
-                nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "資料備份",
-                lbl_start_char: "開頭代碼：", legend_title: "顏色來自測驗：", btn_reset_color: "🔄 重置所有顏色",
-                lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題 (Space)", btn_start_test: "開始測驗 (Space)", 
-                btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter", title_backup: "資料備份與還原", btn_export: "下載備份", 
-                btn_import: "確認匯入", btn_clear_all: "清空所有資料", hint_matrix_edit: "提示：點擊表頭可修改代碼",
-                btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "全表模式", btn_same: "同",
-                alert_chars_empty: "輸入不能為空！", alert_reset: "確定重置？", alert_reset_done: "已重置", 
-                opt_start: " 開頭", sel_full: "全範圍", sel_none: "未選擇", sel_count: "已選 {n} 個", sel_prefix: "已選：",
-                hint_click_flip: "點擊翻牌", fb_empty: "❌ 空白跳過", fb_wrong: "❌ 錯誤", fb_slow: "⭕ 太慢", fb_good: "✨ 熟練",
-                ans_prefix: "答案：", alert_no_data: "請先輸入資料！", alert_sel_range: "請選擇範圍", alert_import_success: "匯入成功", alert_import_error: "格式錯誤"
-            },
-            'en': {
-                nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Backup",
-                lbl_start_char: "Start Code:", legend_title: "Colors from Test:", btn_reset_color: "🔄 Reset Colors",
-                lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next (Space)", btn_start_test: "Start Test (Space)",
-                btn_submit: "Submit (Enter)", ph_input: "Type & Enter", title_backup: "Backup & Restore", btn_export: "Download Backup",
-                btn_import: "Import", btn_clear_all: "Clear All Data", hint_matrix_edit: "Click header to edit code",
-                btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Matrix Mode", btn_same: "Same",
-                alert_chars_empty: "Cannot be empty!", alert_reset: "Are you sure?", alert_reset_done: "Reset done.",
-                opt_start: " Start", sel_full: "All", sel_none: "None", sel_count: "{n} selected", sel_prefix: "Sel: ",
-                hint_click_flip: "Click to flip", fb_empty: "❌ Skipped", fb_wrong: "❌ Wrong", fb_slow: "⭕ Slow", fb_good: "✨ Good",
-                ans_prefix: "Ans: ", alert_no_data: "No data!", alert_sel_range: "Select range", alert_import_success: "Success", alert_import_error: "Error"
-            }
-        };
-
-        function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
-        function getDict() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-        function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
-        function getStatus() { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; }
-        function saveStatus(pair, status) { const s = getStatus(); s[pair] = status; localStorage.setItem(STATUS_KEY, JSON.stringify(s)); }
-
-        function init() {
-            const savedChars = localStorage.getItem(CHARS_KEY);
-            if (savedChars) chars = JSON.parse(savedChars);
-            initUI(); applyLanguage();
-            updateLayoutMode();
-            
-            document.addEventListener('click', function(e) { if (!e.target.closest('.dropdown-wrapper')) { closeAllDropdowns(); } });
-            document.getElementById('test-input').addEventListener('keydown', function(e) { if(e.key === 'Enter') { e.stopPropagation(); checkTestAnswer(); } });
-            document.addEventListener('keydown', function(e) {
-                const activeTab = document.querySelector('.view-section.active').id;
-                if (e.code === 'Space' || e.key === 'Enter') {
-                    if(document.activeElement.tagName === 'INPUT' && !isWaitingTestNext && activeTab === 'view-test') return;
-                    if(document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'test-input') return; 
-                    e.preventDefault(); triggerAction(activeTab);
-                }
-            });
-            renderList();
-        }
-
-        function updateLayoutMode() {
-            if(chars.includes('A')) {
-                document.body.classList.remove('mode-zh');
-                document.body.classList.add('mode-en');
-            } else {
-                document.body.classList.remove('mode-en');
-                document.body.classList.add('mode-zh');
-            }
-        }
-
-        function initUI() {
-            const listSel = document.getElementById('char-select'); listSel.innerHTML = '';
-            chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c}`; listSel.appendChild(opt1); });
-            renderCheckboxes('mem-range-grid', 'mem'); renderCheckboxes('test-range-grid', 'test');
-            updateDropdownLabel('mem'); updateDropdownLabel('test');
-        }
-
-        function toggleViewMode(mode) {
-            isMatrixMode = (mode === 'matrix');
-            const listBtn = document.getElementById('btn-mode-list');
-            const matrixBtn = document.getElementById('btn-mode-matrix');
-            const listControls = document.getElementById('list-mode-controls');
-            const matrixSettings = document.getElementById('matrix-settings'); 
-            const gridArea = document.getElementById('grid-area');
-            const matrixArea = document.getElementById('matrix-area');
-            const container = document.getElementById('main-container');
-
-            if(isMatrixMode) {
-                // 全表模式：變寬
-                container.classList.add('wide-mode');
-                
-                listBtn.style.borderColor = "#cbd5e1"; listBtn.style.color = "#64748b";
-                matrixBtn.style.borderColor = "var(--primary-color)"; matrixBtn.style.color = "var(--primary-color)";
-                listControls.classList.add('hidden'); matrixSettings.classList.remove('hidden'); 
-                gridArea.classList.add('hidden'); matrixArea.classList.remove('hidden');
-                renderMatrix();
-            } else {
-                // 列表模式：變窄
-                container.classList.remove('wide-mode');
-                
-                matrixBtn.style.borderColor = "#cbd5e1"; matrixBtn.style.color = "#64748b";
-                listBtn.style.borderColor = "var(--primary-color)"; listBtn.style.color = "var(--primary-color)";
-                listControls.classList.remove('hidden'); matrixSettings.classList.add('hidden'); 
-                gridArea.classList.remove('hidden'); matrixArea.classList.add('hidden');
-                renderList();
-            }
-        }
-
-        function renderList() {
-            const startChar = document.getElementById('char-select').value;
-            const container = document.getElementById('grid-area');
-            const dict = getDict(); const statusMap = getStatus();
-            container.innerHTML = ''; 
-            chars.forEach((endChar) => {
-                if (startChar === endChar) return; 
-                const pair = startChar + endChar;
-                const div = document.createElement('div'); div.className = 'pair-item';
-                div.innerHTML = `<div class="pair-label">${pair}</div>`;
-                const input = document.createElement('input'); input.className = 'pair-input';
-                const st = statusMap[pair];
-                if(st === 'green') input.classList.add('status-green');
-                else if(st === 'yellow') input.classList.add('status-yellow');
-                else if(st === 'red') input.classList.add('status-red');
-                input.value = dict[pair] || "";
-                input.oninput = function() { const d = getDict(); d[pair] = this.value.trim(); saveDict(d); };
-                div.appendChild(input); container.appendChild(div);
-            });
-        }
-
-        function renderMatrix() {
-            const table = document.getElementById('full-matrix');
-            const dict = getDict();
-            const statusMap = getStatus();
-            
-            let html = '<thead><tr><th></th>';
-            chars.forEach((c, index) => {
-                html += `<th><input value="${c}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
-            });
-            html += '</tr></thead><tbody>';
-
-            chars.forEach((rowChar, rowIndex) => {
-                html += `<tr><th><input value="${rowChar}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
-                chars.forEach((colChar, colIndex) => {
-                    const pair = rowChar + colChar;
-                    const st = statusMap[pair];
-                    let cellClass = '';
-                    if(st === 'green') cellClass = 'status-green';
-                    else if(st === 'yellow') cellClass = 'status-yellow';
-                    else if(st === 'red') cellClass = 'status-red';
-                    
-                    if (rowChar === colChar) {
-                        html += `<td class="cell-diagonal ${cellClass}">
-                            <div class="diagonal-wrapper">
-                                <input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()">
-                                <button class="btn-diagonal-check" onclick="fillSame('${pair}', '${rowChar}', this)">${t('btn_same')}</button>
-                            </div>
-                        </td>`;
-                    } else {
-                        html += `<td class="${cellClass}"><input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()"></td>`;
-                    }
-                });
-                html += '</tr>';
-            });
-            html += '</tbody>';
-            table.innerHTML = html;
-        }
-
-        window.handleFocus = function(el) {
-            const td = el.closest('td'); if(!td) return;
-            const tr = td.parentElement; const table = document.getElementById('full-matrix');
-            if(!tr || !table) return;
-            const colIndex = td.cellIndex; const rowIndex = tr.rowIndex;
-            for(let r = 0; r <= rowIndex; r++) { 
-                if(table.rows[r] && table.rows[r].cells[colIndex]) table.rows[r].cells[colIndex].classList.add('highlight-guide'); 
-            }
-            for(let c = 0; c <= colIndex; c++) { 
-                if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); 
-            }
-        };
-        window.handleBlur = function() { document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); };
-
-        window.updateGlobalChar = function(index, newValue) {
-            const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
-            chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
-            document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
-            initUI(); 
-            updateLayoutMode();
-        };
-        window.updateMatrixInput = function(pair, val) { const d = getDict(); d[pair] = val.trim(); saveDict(d); };
-        window.fillSame = function(pair, char, btn) { const d = getDict(); d[pair] = char; saveDict(d); btn.previousElementSibling.value = char; };
-
-        function resetDefaultChars() {
-            if(confirm(t('alert_reset'))) {
-                chars = (currentLang === 'en') ? [...CHARS_EN] : [...CHARS_ZH];
-                localStorage.removeItem(CHARS_KEY); initUI(); applyLanguage(); updateLayoutMode(); renderMatrix(); alert(t('alert_reset_done'));
-            }
-        }
-        function toggleLanguage() {
-            currentLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
-            localStorage.setItem(LANG_KEY, currentLang); applyLanguage();
-            if (currentLang === 'en' && JSON.stringify(chars) === JSON.stringify(CHARS_ZH)) {
-                if(confirm("Switch to English A-X?")) { chars = [...CHARS_EN]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
-            } else if (currentLang === 'zh-TW' && JSON.stringify(chars) === JSON.stringify(CHARS_EN)) {
-                if(confirm("切換回注音？")) { chars = [...CHARS_ZH]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
-            }
-            updateLayoutMode();
-            if(isMatrixMode) renderMatrix();
-        }
-        function applyLanguage() {
-            document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if(translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
-            const listSel = document.getElementById('char-select'); const currentVal = listSel.value; listSel.innerHTML = ''; 
-            chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c}${t('opt_start')}`; listSel.appendChild(opt); });
-            if(currentVal && chars.includes(currentVal)) listSel.value = currentVal; 
-            if(isWaitingTestNext) document.getElementById('test-btn').innerText = t('btn_start_test'); else document.getElementById('test-btn').innerText = t('btn_submit');
-            if(isMemAnswerShown) document.getElementById('mem-hint').innerText = t('btn_next'); else document.getElementById('mem-hint').innerText = t('hint_click_flip');
-            updateDropdownLabel('mem'); updateDropdownLabel('test');
-        }
-        
-        function toggleDropdown(prefix) { const content = document.getElementById(`${prefix}-dropdown-content`); const isShown = content.classList.contains('show'); closeAllDropdowns(); if (!isShown) content.classList.add('show'); }
-        function closeAllDropdowns() { document.querySelectorAll('.dropdown-content').forEach(el => el.classList.remove('show')); }
-        function updateDropdownLabel(prefix) { const selected = getSelectedRanges(prefix); const btn = document.getElementById(`${prefix}-dropdown-btn`); if (selected.length === chars.length) btn.innerText = t('sel_full'); else if (selected.length === 0) btn.innerText = t('sel_none'); else btn.innerText = selected.length <= 5 ? `${t('sel_prefix')}${selected.join(', ')}` : t('sel_count', {n: selected.length}); }
-        function renderCheckboxes(containerId, prefix) { const container = document.getElementById(containerId); container.innerHTML = ''; chars.forEach((c) => { const label = document.createElement('label'); label.style = 'display:flex;align-items:center;'; const input = document.createElement('input'); input.type = 'checkbox'; input.value = c; input.name = prefix + '_range'; input.checked = true; input.onchange = () => updateDropdownLabel(prefix); label.appendChild(input); label.appendChild(document.createTextNode(c)); container.appendChild(label); }); }
-        function toggleAll(prefix, state) { document.querySelectorAll(`input[name="${prefix}_range"]`).forEach(input => input.checked = state); updateDropdownLabel(prefix); }
-        function getSelectedRanges(prefix) { return Array.from(document.querySelectorAll(`input[name="${prefix}_range"]:checked`)).map(i => i.value); }
-        function triggerAction(tabId) { if(tabId === 'view-memory') { if(isMemAnswerShown) nextMemoryCard(); else toggleMemoryAnswer(); } else if(tabId === 'view-test') { if(isWaitingTestNext) startTestQuestion(); } }
-        
-        function switchTab(tab) { 
-            document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active')); 
-            document.querySelectorAll('.nav-btn').forEach(e => e.classList.remove('active')); 
-            document.getElementById(`view-${tab}`).classList.add('active'); 
-            const btnIndex = {'list':0, 'memory':1, 'test':2, 'data':3}; 
-            document.querySelectorAll('.nav-btn')[btnIndex[tab]].classList.add('active'); 
-            
-            // 關鍵修正：切換 Tab 時，確保容器寬度恢復正常
-            const container = document.getElementById('main-container');
-            if (tab === 'list' && isMatrixMode) {
-                container.classList.add('wide-mode'); // 如果在列表頁且是全表模式 -> 寬
-            } else {
-                container.classList.remove('wide-mode'); // 其他頁面 -> 窄
-            }
-
-            if(timerInterval) clearInterval(timerInterval); 
-            if(tab === 'list') { 
-                if(isMatrixMode) renderMatrix();
-                else renderList(); 
-            } 
-            if(tab === 'memory') nextMemoryCard(); 
-            if(tab === 'test') { 
-                document.getElementById('test-feedback').innerText = ''; 
-                document.getElementById('test-correct-msg').innerText = ''; 
-                isWaitingTestNext = true; applyLanguage(); 
-            }
-        }
-
-        function resetAllColors() { 
-            if(confirm(t('alert_reset'))) { 
-                localStorage.setItem(STATUS_KEY, JSON.stringify({})); 
-                if(isMatrixMode) renderMatrix(); 
-                else renderList(); 
-                alert(t('alert_reset_done')); 
-            } 
-        }
-        function nextMemoryCard() {
-            const selectedChars = getSelectedRanges('mem'); 
-            if(selectedChars.length === 0) { 
-                alert(t('alert_sel_range')); 
-                return; 
-            } 
-            let potentialPair; 
-            let attempts = 0; 
-            do { 
-                const randomStartChar = selectedChars[Math.floor(Math.random() * selectedChars.length)]; 
-                let randomEndChar = chars[Math.floor(Math.random()*chars.length)]; 
-                while(randomStartChar === randomEndChar) { 
-                    randomEndChar = chars[Math.floor(Math.random()*chars.length)]; 
-                } potentialPair = randomStartChar + randomEndChar; attempts++; 
-            } while (potentialPair === lastMemPair && attempts < 10); 
-            lastMemPair = potentialPair; 
-            currentPair = potentialPair; 
-            document.getElementById('mem-q').innerText = currentPair; 
-            document.getElementById('mem-a').classList.remove('show'); 
-            isMemAnswerShown = false; applyLanguage(); 
-        }
-        function toggleMemoryAnswer() { 
-            if(isMemAnswerShown) return; 
-            const word = getDict()[currentPair] || "N/A"; document.getElementById('mem-a').innerText = word; 
-            document.getElementById('mem-a').classList.add('show'); 
-            isMemAnswerShown = true; applyLanguage(); 
-        }
-        function startTestQuestion() { 
-            const dict = getDict(); 
-            const statusMap = getStatus(); 
-            const valid = Object.keys(dict).filter(k => dict[k]); // 有資料的題目
-            
-            if(valid.length === 0) return alert(t('alert_no_data')); 
-            
-            const selectedChars = getSelectedRanges('test'); 
-            if(selectedChars.length === 0) return alert(t('alert_sel_range')); 
-            
-            // 1. 篩選出符合範圍的題目
-            let candidates = valid.filter(p => selectedChars.includes(p[0])); 
-            if(candidates.length === 0) return alert(t('alert_no_data')); 
-
-            // 避免連續出現同一題 (除非只有一題)
-            let pool = candidates; 
-            if (candidates.length > 1 && lastTestPair) { 
-                pool = candidates.filter(p => p !== lastTestPair); 
-            } 
-
-            // 2. 分類
-            let untested = []; // 沒測過
-            let learning = []; // 不熟 (紅/黃)
-            let mastered = []; // 熟悉 (綠)
-
-            pool.forEach(p => { 
-                const s = statusMap[p]; 
-                if (!s) untested.push(p);          // 無狀態
-                else if (s === 'green') mastered.push(p); // 綠色
-                else learning.push(p);             // 紅色或黃色
-            }); 
-
-            // 3. 加權隨機選擇 (權重可在此調整)
-            let targetGroup = [];
-            const rand = Math.random();
-
-            // 邏輯：
-            // 如果還有「未測驗」，70% 機率選未測驗，20% 選不熟，10% 選熟悉。
-            // 如果「未測驗」沒了，則 80% 選不熟，20% 選熟悉。
-            // 如果只剩其中一類，就直接選那一類。
-
-            if (untested.length > 0) {
-                if (rand < 0.7) targetGroup = untested;       // 70% 新題目
-                else if (rand < 0.9) targetGroup = (learning.length > 0) ? learning : untested; // 20% 複習錯的
-                else targetGroup = (mastered.length > 0) ? mastered : ((learning.length > 0) ? learning : untested); // 10% 複習熟的
-            } else if (learning.length > 0) {
-                if (rand < 0.8) targetGroup = learning;       // 80% 複習錯的
-                else targetGroup = (mastered.length > 0) ? mastered : learning; // 20% 複習熟的
-            } else {
-                targetGroup = mastered; // 只剩熟的，就練熟的
-            }
-
-            // 4. 出題
-            currentPair = targetGroup[Math.floor(Math.random() * targetGroup.length)]; 
-            lastTestPair = currentPair; 
-            
-            document.getElementById('test-q').innerText = currentPair; 
-            const inp = document.getElementById('test-input'); 
-            inp.value = ''; 
-            inp.disabled = false; 
-            inp.focus(); 
-            
-            document.getElementById('test-feedback').innerText = ''; 
-            document.getElementById('test-correct-msg').innerText = ''; 
-            isWaitingTestNext = false; 
-            applyLanguage(); 
-            
-            if(timerInterval) clearInterval(timerInterval); 
-            testStartTime = Date.now(); 
-            document.getElementById('timer').innerText = "0.0s"; 
-            timerInterval = setInterval(() => { 
-                document.getElementById('timer').innerText = ((Date.now() - testStartTime) / 1000).toFixed(1) + "s"; 
-            }, 100); 
-        }
-        function checkTestAnswer() { 
-            if(isWaitingTestNext) return; 
-            clearInterval(timerInterval); 
-            const duration = (Date.now() - testStartTime) / 1000; 
-            const val = document.getElementById('test-input').value.trim(); 
-            const ans = getDict()[currentPair]; 
-            let st = '', msg = ''; 
-            if(val === '') { 
-                st = 'red'; msg = t('fb_empty'); 
-            } else if(val !== ans) { 
-                st = 'red'; msg = t('fb_wrong'); 
-            } else if(duration > 12) { 
-                st = 'red'; msg = t('fb_slow'); 
-            } else if(duration > 8) { 
-                st = 'yellow'; msg = "OK"; 
-            } else { st = 'green'; msg = t('fb_good'); 
-
-            } 
-            saveStatus(currentPair, st); 
-            document.getElementById('test-feedback').innerText = msg + ` (${duration.toFixed(1)}s)`; 
-            document.getElementById('test-correct-msg').innerText = t('ans_prefix') + ans; 
-            document.getElementById('test-input').disabled = true; isWaitingTestNext = true; applyLanguage(); 
-        }
-        function exportData() { 
-            const blob = new Blob([JSON.stringify({ 
-                dict: getDict(), status: getStatus(), chars: chars })], {type: "application/json"}); 
-                const url = URL.createObjectURL(blob); 
-                const a = document.createElement('a'); 
-                a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
-                document.body.appendChild(a); 
-                a.click(); document.body.removeChild(a); 
-            }
-        function importData() { 
-            const fileInput = document.getElementById('file-input'); 
-            const f = fileInput.files[0]; 
-            if(!f) return; const r = new FileReader(); r.onload = (e) => { 
-                try { const d = JSON.parse(e.target.result); 
-                    if(d.dict) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict)); 
-                        localStorage.setItem(STATUS_KEY, JSON.stringify(d.status || {})); 
-                        if(d.chars) { 
-                            chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); 
-                        } 
-                    } 
-                    alert(t('alert_import_success')); 
-                    initUI(); updateLayoutMode(); 
-                    if(isMatrixMode) renderMatrix(); 
-                    else renderList(); 
-                } catch(err) { 
-                    alert(t('alert_import_error')); 
-                } 
-            }; 
-            r.readAsText(f); 
-        }
-        function clearAllData() { 
-            if(confirm(t('alert_reset'))) { 
-                localStorage.clear(); location.reload(); 
-            } 
-        }
-    </script>
+    
+    <script src="script.js"></script>
 </body>
 </html>
