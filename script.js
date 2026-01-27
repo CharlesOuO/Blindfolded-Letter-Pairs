@@ -1,8 +1,18 @@
 const CHARS_ZH = ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ'];
 const CHARS_EN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X'];
 let chars = [...CHARS_ZH];
-const STORAGE_KEY = 'bld_custom_dict_v3'; const STATUS_KEY = 'bld_status_v1'; const LANG_KEY = 'bld_lang_v1'; const CHARS_KEY = 'bld_chars_v1';
-let currentPair = null; let isMemAnswerShown = false; let testStartTime = 0; let isWaitingTestNext = true; let timerInterval = null; let lastMemPair = null; let lastTestPair = null;
+const STORAGE_KEY = 'bld_custom_dict_v3'; 
+const STATUS_KEY = 'bld_status_v1'; 
+const LANG_KEY = 'bld_lang_v1'; 
+const CHARS_KEY = 'bld_chars_v1';
+
+let currentPair = null; 
+let isMemAnswerShown = false; 
+let testStartTime = 0; 
+let isWaitingTestNext = true; 
+let timerInterval = null; 
+let lastMemPair = null; 
+let lastTestPair = null;
 let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
 let isMatrixMode = false;
 
@@ -33,17 +43,87 @@ const translations = {
     }
 };
 
+// --- SM-2 演算法與資料存取 ---
+const SM2_SETTINGS = {
+    defaultEf: 2.5,
+    minEf: 1.3,
+    intervals: [1, 3] // 第一級間隔1天，第二級間隔3天
+};
+
+function calculateNextReview(currentData, grade) {
+    let card = (typeof currentData === 'object' && currentData !== null) ? currentData : {
+        interval: 0, repetition: 0, ef: SM2_SETTINGS.defaultEf, dueDate: 0, color: 'red'
+    };
+    
+    let nextInterval, nextRepetition, nextEf;
+
+    if (grade < 3) {
+        // Fail
+        nextRepetition = 0;
+        nextInterval = 1; 
+        nextEf = Math.max(SM2_SETTINGS.minEf, card.ef - 0.2);
+    } else {
+        // Pass
+        nextRepetition = card.repetition + 1;
+        nextEf = card.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+        if (nextEf < SM2_SETTINGS.minEf) nextEf = SM2_SETTINGS.minEf;
+
+        if (nextRepetition === 1) nextInterval = SM2_SETTINGS.intervals[0];
+        else if (nextRepetition === 2) nextInterval = SM2_SETTINGS.intervals[1];
+        else nextInterval = Math.round(card.interval * nextEf);
+    }
+
+    const nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
+    
+    // 視覺化顏色判定
+    let nextColor = 'red';
+    if (grade >= 3) {
+        if (nextInterval > 21) nextColor = 'green';
+        else if (nextInterval > 3) nextColor = 'yellow';
+        else nextColor = 'red';
+    }
+
+    return {
+        interval: nextInterval, repetition: nextRepetition, ef: nextEf, dueDate: nextDueDate, color: nextColor
+    };
+}
+
+function getStatusMap() { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; }
+
+function getPairData(pair) {
+    const map = getStatusMap();
+    let data = map[pair];
+    // 兼容舊版字串資料
+    if (typeof data === 'string') {
+        return {
+            interval: (data === 'green' ? 10 : (data === 'yellow' ? 3 : 0)), 
+            repetition: (data === 'green' ? 3 : 0),
+            ef: 2.5, dueDate: Date.now(), color: data
+        };
+    }
+    return data || null;
+}
+
+function saveStatusData(pair, dataObject) {
+    const map = getStatusMap();
+    map[pair] = dataObject;
+    localStorage.setItem(STATUS_KEY, JSON.stringify(map));
+}
+
+function getPairColor(pair) {
+    const data = getPairData(pair);
+    return data ? (data.color || 'red') : '';
+}
+
+// --- 核心功能 ---
 function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
 function getDict() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
 function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
-function getStatus() { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; }
-function saveStatus(pair, status) { const s = getStatus(); s[pair] = status; localStorage.setItem(STATUS_KEY, JSON.stringify(s)); }
 
 function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
-    initUI(); applyLanguage();
-    updateLayoutMode();
+    initUI(); applyLanguage(); updateLayoutMode();
     
     document.addEventListener('click', function(e) { if (!e.target.closest('.dropdown-wrapper')) { closeAllDropdowns(); } });
     document.getElementById('test-input').addEventListener('keydown', function(e) { if(e.key === 'Enter') { e.stopPropagation(); checkTestAnswer(); } });
@@ -59,13 +139,8 @@ function init() {
 }
 
 function updateLayoutMode() {
-    if(chars.includes('A')) {
-        document.body.classList.remove('mode-zh');
-        document.body.classList.add('mode-en');
-    } else {
-        document.body.classList.remove('mode-en');
-        document.body.classList.add('mode-zh');
-    }
+    if(chars.includes('A')) { document.body.classList.remove('mode-zh'); document.body.classList.add('mode-en'); } 
+    else { document.body.classList.remove('mode-en'); document.body.classList.add('mode-zh'); }
 }
 
 function initUI() {
@@ -105,7 +180,7 @@ function toggleViewMode(mode) {
 function renderList() {
     const startChar = document.getElementById('char-select').value;
     const container = document.getElementById('grid-area');
-    const dict = getDict(); const statusMap = getStatus();
+    const dict = getDict();
     container.innerHTML = ''; 
     chars.forEach((endChar) => {
         if (startChar === endChar) return; 
@@ -113,10 +188,11 @@ function renderList() {
         const div = document.createElement('div'); div.className = 'pair-item';
         div.innerHTML = `<div class="pair-label">${pair}</div>`;
         const input = document.createElement('input'); input.className = 'pair-input';
-        const st = statusMap[pair];
-        if(st === 'green') input.classList.add('status-green');
-        else if(st === 'yellow') input.classList.add('status-yellow');
-        else if(st === 'red') input.classList.add('status-red');
+        
+        // 使用新顏色判定
+        const stColor = getPairColor(pair);
+        if(stColor) input.classList.add(`status-${stColor}`);
+
         input.value = dict[pair] || "";
         input.oninput = function() { const d = getDict(); d[pair] = this.value.trim(); saveDict(d); };
         div.appendChild(input); container.appendChild(div);
@@ -126,7 +202,6 @@ function renderList() {
 function renderMatrix() {
     const table = document.getElementById('full-matrix');
     const dict = getDict();
-    const statusMap = getStatus();
     
     let html = '<thead><tr><th></th>';
     chars.forEach((c, index) => {
@@ -138,11 +213,8 @@ function renderMatrix() {
         html += `<tr><th><input value="${rowChar}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
         chars.forEach((colChar, colIndex) => {
             const pair = rowChar + colChar;
-            const st = statusMap[pair];
-            let cellClass = '';
-            if(st === 'green') cellClass = 'status-green';
-            else if(st === 'yellow') cellClass = 'status-yellow';
-            else if(st === 'red') cellClass = 'status-red';
+            const stColor = getPairColor(pair);
+            let cellClass = stColor ? `status-${stColor}` : '';
             
             if (rowChar === colChar) {
                 html += `<td class="cell-diagonal ${cellClass}">
@@ -166,21 +238,15 @@ window.handleFocus = function(el) {
     const tr = td.parentElement; const table = document.getElementById('full-matrix');
     if(!tr || !table) return;
     const colIndex = td.cellIndex; const rowIndex = tr.rowIndex;
-    for(let r = 0; r <= rowIndex; r++) { 
-        if(table.rows[r] && table.rows[r].cells[colIndex]) table.rows[r].cells[colIndex].classList.add('highlight-guide'); 
-    }
-    for(let c = 0; c <= colIndex; c++) { 
-        if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); 
-    }
+    for(let r = 0; r <= rowIndex; r++) { if(table.rows[r] && table.rows[r].cells[colIndex]) table.rows[r].cells[colIndex].classList.add('highlight-guide'); }
+    for(let c = 0; c <= colIndex; c++) { if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); }
 };
 window.handleBlur = function() { document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); };
-
 window.updateGlobalChar = function(index, newValue) {
     const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
     chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
     document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
-    initUI(); 
-    updateLayoutMode();
+    initUI(); updateLayoutMode();
 };
 window.updateMatrixInput = function(pair, val) { const d = getDict(); d[pair] = val.trim(); saveDict(d); };
 window.fillSame = function(pair, char, btn) { const d = getDict(); d[pair] = char; saveDict(d); btn.previousElementSibling.value = char; };
@@ -199,8 +265,7 @@ function toggleLanguage() {
     } else if (currentLang === 'zh-TW' && JSON.stringify(chars) === JSON.stringify(CHARS_EN)) {
         if(confirm("切換回注音？")) { chars = [...CHARS_ZH]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
     }
-    updateLayoutMode();
-    if(isMatrixMode) renderMatrix();
+    updateLayoutMode(); if(isMatrixMode) renderMatrix();
 }
 function applyLanguage() {
     document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if(translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
@@ -208,11 +273,7 @@ function applyLanguage() {
     chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c}${t('opt_start')}`; listSel.appendChild(opt); });
     if(currentVal && chars.includes(currentVal)) listSel.value = currentVal; 
     if(isWaitingTestNext) document.getElementById('test-btn').innerText = t('btn_start_test'); else document.getElementById('test-btn').innerText = t('btn_submit');
-    
-    // 更新記憶翻牌提示
-    if(isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; 
-    else document.getElementById('mem-hint').style.visibility = 'visible';
-
+    if(isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; else document.getElementById('mem-hint').style.visibility = 'visible';
     updateDropdownLabel('mem'); updateDropdownLabel('test');
 }
 
@@ -230,64 +291,63 @@ function switchTab(tab) {
     document.getElementById(`view-${tab}`).classList.add('active'); 
     const btnIndex = {'list':0, 'memory':1, 'test':2, 'data':3}; 
     document.querySelectorAll('.nav-btn')[btnIndex[tab]].classList.add('active'); 
-    
     const container = document.getElementById('main-container');
-    if (tab === 'list' && isMatrixMode) {
-        container.classList.add('wide-mode');
-    } else {
-        container.classList.remove('wide-mode');
-    }
-
+    if (tab === 'list' && isMatrixMode) container.classList.add('wide-mode'); else container.classList.remove('wide-mode');
     if(timerInterval) clearInterval(timerInterval); 
-    if(tab === 'list') { 
-        if(isMatrixMode) renderMatrix();
-        else renderList(); 
-    } 
+    if(tab === 'list') { if(isMatrixMode) renderMatrix(); else renderList(); } 
     if(tab === 'memory') nextMemoryCard(); 
-    if(tab === 'test') { 
-        document.getElementById('test-feedback').innerText = ''; 
-        document.getElementById('test-correct-msg').innerText = ''; 
-        isWaitingTestNext = true; applyLanguage(); 
-    }
+    if(tab === 'test') { document.getElementById('test-feedback').innerText = ''; document.getElementById('test-correct-msg').innerText = ''; isWaitingTestNext = true; applyLanguage(); }
 }
 
 function resetAllColors() { 
     if(confirm(t('alert_reset'))) { 
         localStorage.setItem(STATUS_KEY, JSON.stringify({})); 
-        if(isMatrixMode) renderMatrix(); 
-        else renderList(); 
+        if(isMatrixMode) renderMatrix(); else renderList(); 
         alert(t('alert_reset_done')); 
     } 
 }
 
-function markMemStatus(status) {
+function markMemStatus(gradeType) {
     if (!currentPair) return;
-    saveStatus(currentPair, status);
+    let grade;
+    if (gradeType === 'red') grade = 1;
+    else if (gradeType === 'yellow') grade = 3;
+    else if (gradeType === 'green') grade = 5;
+    
+    const currentData = getPairData(currentPair);
+    const newData = calculateNextReview(currentData, grade);
+    saveStatusData(currentPair, newData);
     nextMemoryCard();
 }
 
 function nextMemoryCard() {
     const selectedChars = getSelectedRanges('mem'); 
-    if(selectedChars.length === 0) { 
-        alert(t('alert_sel_range')); 
-        return; 
-    } 
-    
-    // Hide grading buttons, show hint
+    if(selectedChars.length === 0) { alert(t('alert_sel_range')); return; } 
     document.getElementById('mem-grading-area').classList.add('hidden');
     document.getElementById('mem-hint').style.visibility = 'visible';
 
-    let potentialPair; 
-    let attempts = 0; 
-    do { 
-        const randomStartChar = selectedChars[Math.floor(Math.random() * selectedChars.length)]; 
-        let randomEndChar = chars[Math.floor(Math.random()*chars.length)]; 
-        while(randomStartChar === randomEndChar) { 
-            randomEndChar = chars[Math.floor(Math.random()*chars.length)]; 
-        } potentialPair = randomStartChar + randomEndChar; attempts++; 
-    } while (potentialPair === lastMemPair && attempts < 10); 
-    lastMemPair = potentialPair; 
-    currentPair = potentialPair; 
+    // 篩選優先複習的卡片
+    const dict = getDict();
+    const now = Date.now();
+    let candidates = Object.keys(dict).filter(k => dict[k] && selectedChars.includes(k[0]));
+    
+    let dueCards = [];
+    let newCards = [];
+    candidates.forEach(pair => {
+        const data = getPairData(pair);
+        if (!data) newCards.push(pair);
+        else if (data.dueDate <= now) dueCards.push(pair);
+    });
+
+    let pool = [];
+    if (dueCards.length > 0) pool = dueCards;
+    else if (newCards.length > 0) pool = newCards;
+    else pool = candidates;
+
+    if (pool.length > 1 && lastMemPair) pool = pool.filter(p => p !== lastMemPair);
+
+    currentPair = pool[Math.floor(Math.random() * pool.length)]; 
+    lastMemPair = currentPair; 
     document.getElementById('mem-q').innerText = currentPair; 
     document.getElementById('mem-a').classList.remove('show'); 
     isMemAnswerShown = false; applyLanguage(); 
@@ -297,63 +357,46 @@ function toggleMemoryAnswer() {
     if(isMemAnswerShown) return; 
     const word = getDict()[currentPair] || "N/A"; document.getElementById('mem-a').innerText = word; 
     document.getElementById('mem-a').classList.add('show'); 
-    
-    // Show grading buttons, hide hint
     document.getElementById('mem-grading-area').classList.remove('hidden');
     document.getElementById('mem-hint').style.visibility = 'hidden';
-
     isMemAnswerShown = true; applyLanguage(); 
 }
 
 function startTestQuestion() { 
     const dict = getDict(); 
-    const statusMap = getStatus(); 
     const valid = Object.keys(dict).filter(k => dict[k]); 
     if(valid.length === 0) return alert(t('alert_no_data')); 
     const selectedChars = getSelectedRanges('test'); 
     if(selectedChars.length === 0) return alert(t('alert_sel_range')); 
     
+    const now = Date.now();
     let candidates = valid.filter(p => selectedChars.includes(p[0])); 
     if(candidates.length === 0) return alert(t('alert_no_data')); 
 
-    let pool = candidates; 
-    if (candidates.length > 1 && lastTestPair) { 
-        pool = candidates.filter(p => p !== lastTestPair); 
-    } 
+    let dueCards = [];
+    let newCards = [];
+    candidates.forEach(pair => {
+        const data = getPairData(pair);
+        if (!data) newCards.push(pair);
+        else if (data.dueDate <= now) dueCards.push(pair);
+    });
 
-    let untested = []; 
-    let learning = []; 
-    let mastered = []; 
-
-    pool.forEach(p => { 
-        const s = statusMap[p]; 
-        if (!s) untested.push(p); 
-        else if (s === 'green') mastered.push(p); 
-        else learning.push(p); 
-    }); 
-
-    let targetGroup = [];
-    const rand = Math.random();
-
-    if (untested.length > 0) {
-        if (rand < 0.7) targetGroup = untested; 
-        else if (rand < 0.9) targetGroup = (learning.length > 0) ? learning : untested; 
-        else targetGroup = (mastered.length > 0) ? mastered : ((learning.length > 0) ? learning : untested); 
-    } else if (learning.length > 0) {
-        if (rand < 0.8) targetGroup = learning; 
-        else targetGroup = (mastered.length > 0) ? mastered : learning; 
+    let pool = [];
+    if (Math.random() < 0.8 && (dueCards.length > 0 || newCards.length > 0)) {
+        if (dueCards.length > 0) pool = dueCards;
+        else pool = newCards;
     } else {
-        targetGroup = mastered; 
+        pool = candidates;
     }
 
-    currentPair = targetGroup[Math.floor(Math.random() * targetGroup.length)]; 
+    if (pool.length > 1 && lastTestPair) pool = pool.filter(p => p !== lastTestPair); 
+
+    currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastTestPair = currentPair; 
     
     document.getElementById('test-q').innerText = currentPair; 
     const inp = document.getElementById('test-input'); 
-    inp.value = ''; 
-    inp.disabled = false; 
-    inp.focus(); 
+    inp.value = ''; inp.disabled = false; inp.focus(); 
     
     document.getElementById('test-feedback').innerText = ''; 
     document.getElementById('test-correct-msg').innerText = ''; 
@@ -374,56 +417,62 @@ function checkTestAnswer() {
     const duration = (Date.now() - testStartTime) / 1000; 
     const val = document.getElementById('test-input').value.trim(); 
     const ans = getDict()[currentPair]; 
-    let st = '', msg = ''; 
-    if(val === '') { 
-        st = 'red'; msg = t('fb_empty'); 
-    } else if(val !== ans) { 
-        st = 'red'; msg = t('fb_wrong'); 
-    } else if(duration > 12) { 
-        st = 'red'; msg = t('fb_slow'); 
-    } else if(duration > 8) { 
-        st = 'yellow'; msg = "OK"; 
-    } else { st = 'green'; msg = t('fb_good'); 
+    
+    let grade = 0;
+    let msg = '';
+    let textColorClass = '';
 
+    if(val === '') { 
+        grade = 0; msg = t('fb_empty'); textColorClass = 'text-danger';
+    } else if(val !== ans) { 
+        grade = 1; msg = t('fb_wrong'); textColorClass = 'text-danger';
+    } else { 
+        // --- 根據你的需求修改的時間判定邏輯 ---
+        if(duration < 8.0) { 
+            grade = 5; msg = t('fb_good'); textColorClass = 'text-success';
+        } else if(duration <= 12.0) { 
+            grade = 3; msg = t('fb_slow'); textColorClass = 'text-warning';
+        } else { 
+            grade = 1; msg = t('fb_wrong') + " (Timeout)"; textColorClass = 'text-danger';
+        }
     } 
-    saveStatus(currentPair, st); 
-    document.getElementById('test-feedback').innerText = msg + ` (${duration.toFixed(1)}s)`; 
+    
+    const currentData = getPairData(currentPair);
+    const newData = calculateNextReview(currentData, grade);
+    saveStatusData(currentPair, newData);
+    
+    const feedbackEl = document.getElementById('test-feedback');
+    feedbackEl.innerText = msg + ` (${duration.toFixed(1)}s)`;
+    feedbackEl.className = ''; // 清除舊 class
+    feedbackEl.classList.add(textColorClass);
+
     document.getElementById('test-correct-msg').innerText = t('ans_prefix') + ans; 
     document.getElementById('test-input').disabled = true; isWaitingTestNext = true; applyLanguage(); 
 }
 
 function exportData() { 
-    const blob = new Blob([JSON.stringify({ 
-        dict: getDict(), status: getStatus(), chars: chars })], {type: "application/json"}); 
-        const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); 
-        a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
-        document.body.appendChild(a); 
-        a.click(); document.body.removeChild(a); 
-    }
+    const blob = new Blob([JSON.stringify({ dict: getDict(), status: getStatusMap(), chars: chars })], {type: "application/json"}); 
+    const url = URL.createObjectURL(blob); 
+    const a = document.createElement('a'); 
+    a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+}
 function importData() { 
     const fileInput = document.getElementById('file-input'); 
     const f = fileInput.files[0]; 
     if(!f) return; const r = new FileReader(); r.onload = (e) => { 
         try { const d = JSON.parse(e.target.result); 
-            if(d.dict) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict)); 
+            if(d.dict) { 
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict)); 
                 localStorage.setItem(STATUS_KEY, JSON.stringify(d.status || {})); 
-                if(d.chars) { 
-                    chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); 
-                } 
+                if(d.chars) { chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); } 
             } 
-            alert(t('alert_import_success')); 
-            initUI(); updateLayoutMode(); 
-            if(isMatrixMode) renderMatrix(); 
-            else renderList(); 
-        } catch(err) { 
-            alert(t('alert_import_error')); 
-        } 
+            alert(t('alert_import_success')); initUI(); updateLayoutMode(); 
+            if(isMatrixMode) renderMatrix(); else renderList(); 
+        } catch(err) { alert(t('alert_import_error')); } 
     }; 
     r.readAsText(f); 
 }
 function clearAllData() { 
-    if(confirm(t('alert_reset'))) { 
-        localStorage.clear(); location.reload(); 
-    } 
+    if(confirm(t('alert_reset'))) { localStorage.clear(); location.reload(); } 
 }

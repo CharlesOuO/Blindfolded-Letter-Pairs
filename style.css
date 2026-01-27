@@ -87,7 +87,7 @@ body {
 
 .hidden { display: none !important; }
 
-/* --- 核心卡片與控制面板 (置中對齊) --- */
+/* --- 核心卡片與控制面板 --- */
 .control-panel { 
     background: white; 
     padding: 20px; 
@@ -96,30 +96,17 @@ body {
     margin-bottom: 20px; 
     text-align: center; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-    
-    /* 置中設定：讓控制面板與卡片同寬且對齊 */
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
 }
+.container.wide-mode .control-panel { max-width: 100%; }
 
-/* 列表模式全寬時解除限制 */
-.container.wide-mode .control-panel {
-    max-width: 100%;
-}
-
-/* 水平對齊容器：確保標籤和按鈕垂直置中 */
 .control-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
+    display: flex; justify-content: center; align-items: center;
+    gap: 12px; width: 100%;
 }
-.control-row label {
-    white-space: nowrap;
-    margin: 0;
-}
+.control-row label { white-space: nowrap; margin: 0; }
 
 .card-area, .card-area-test {
     background: white;
@@ -127,41 +114,26 @@ body {
     border-radius: 24px;
     border: 1px solid #e2e8f0;
     text-align: center;
-    
-    /* 置中設定 */
     margin: 20px auto;
     max-width: 600px;
     min-height: 320px;
-
     box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
     position: relative;
     cursor: pointer;
     transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
 }
-
-.card-area:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.12);
-}
+.card-area:hover { transform: translateY(-5px); box-shadow: 0 20px 40px -10px rgba(0,0,0,0.12); }
 
 .question {
-    font-size: 6rem;
-    margin-bottom: 10px;
-    font-weight: 400;
-    line-height: 1.2;
-    color: #1e293b;
+    font-size: 6rem; margin-bottom: 10px;
+    font-weight: 400; line-height: 1.2; color: #1e293b;
 }
 
 .answer-text {
-    font-size: 2.5rem;
-    color: #dc2626;
-    display: none;
-    font-weight: 700;
-    margin: 10px 0 20px 0;
+    font-size: 2.5rem; color: #dc2626; display: none;
+    font-weight: 700; margin: 10px 0 20px 0;
 }
 .answer-text.show { display: block; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
@@ -169,31 +141,16 @@ body {
 
 /* --- 評分按鈕美化 --- */
 .grading-btns {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 16px;
-    margin-top: auto;
-    width: 100%;
-    padding-top: 20px;
+    display: flex; justify-content: center; align-items: center;
+    gap: 16px; margin-top: auto; width: 100%; padding-top: 20px;
     animation: fadeIn 0.3s;
 }
-
 .grading-btn {
-    flex: 1;
-    padding: 12px 0;
-    font-size: 1rem;
-    font-weight: 700;
-    border-radius: 50px;
-    border: none;
-    cursor: pointer;
+    flex: 1; padding: 12px 0; font-size: 1rem; font-weight: 700;
+    border-radius: 50px; border: none; cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    max-width: 110px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* gap: 6px; 移除 gap 因為沒有 icon 了 */
+    max-width: 110px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    display: flex; align-items: center; justify-content: center;
 }
 .grading-btn:active { transform: scale(0.95); }
 
@@ -206,23 +163,13 @@ body {
 .btn-grade-green { background: #dcfce7; color: #16a34a; }
 .btn-grade-green:hover { background: #4ade80; color: #065f46; box-shadow: 0 5px 15px rgba(34, 197, 94, 0.3); }
 
-/* --- Ghost Button (弱化後的下一題按鈕) --- */
+/* --- Ghost Button --- */
 .btn-ghost {
-    background: transparent;
-    border: 2px solid #e2e8f0;
-    color: #94a3b8;
-    padding: 10px 24px;
-    border-radius: 99px;
-    font-weight: 600;
-    margin-top: 10px;
-    cursor: pointer;
-    transition: 0.2s;
+    background: transparent; border: 2px solid #e2e8f0; color: #94a3b8;
+    padding: 10px 24px; border-radius: 99px; font-weight: 600;
+    margin-top: 10px; cursor: pointer; transition: 0.2s;
 }
-.btn-ghost:hover {
-    border-color: #cbd5e1;
-    color: #64748b;
-    background: #f8fafc;
-}
+.btn-ghost:hover { border-color: #cbd5e1; color: #64748b; background: #f8fafc; }
 
 /* --- Matrix Table --- */
 .matrix-wrapper { 
@@ -301,3 +248,8 @@ body {
     .checkbox-grid { grid-template-columns: repeat(4, 1fr); }
     #test-input { width: 100%; max-width: none; }
 }
+
+/* --- [新增] 用於 SM-2 演算法回饋的文字顏色 --- */
+.text-success { color: #16a34a !important; }
+.text-warning { color: #b45309 !important; }
+.text-danger  { color: #dc2626 !important; }
