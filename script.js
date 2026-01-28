@@ -75,12 +75,17 @@ function calculateNextReview(currentData, grade) {
 
     const nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
     
-    // 視覺化顏色判定
+    // --- 視覺化顏色判定 (基於動作) ---
     let nextColor = 'red';
-    if (grade >= 3) {
-        if (nextInterval > 21) nextColor = 'green';
-        else if (nextInterval > 3) nextColor = 'yellow';
-        else nextColor = 'red';
+    if (grade >= 4) {
+        // 5=Easy(按綠鈕), 4=Good(打字<8s) -> 顯示綠色
+        nextColor = 'green';
+    } else if (grade === 3) {
+        // 3=Hard(按黃鈕/打字8-12s) -> 顯示黃色
+        nextColor = 'yellow';
+    } else {
+        // 0~2=Fail(按紅鈕/打字太慢/錯誤) -> 顯示紅色
+        nextColor = 'red';
     }
 
     return {
@@ -326,7 +331,6 @@ function nextMemoryCard() {
     document.getElementById('mem-grading-area').classList.add('hidden');
     document.getElementById('mem-hint').style.visibility = 'visible';
 
-    // 篩選優先複習的卡片
     const dict = getDict();
     const now = Date.now();
     let candidates = Object.keys(dict).filter(k => dict[k] && selectedChars.includes(k[0]));
@@ -427,7 +431,7 @@ function checkTestAnswer() {
     } else if(val !== ans) { 
         grade = 1; msg = t('fb_wrong'); textColorClass = 'text-danger';
     } else { 
-        // --- 根據你的需求修改的時間判定邏輯 ---
+        // --- 根據你的 8s/12s 需求判定的 Grade ---
         if(duration < 8.0) { 
             grade = 5; msg = t('fb_good'); textColorClass = 'text-success';
         } else if(duration <= 12.0) { 
@@ -443,7 +447,7 @@ function checkTestAnswer() {
     
     const feedbackEl = document.getElementById('test-feedback');
     feedbackEl.innerText = msg + ` (${duration.toFixed(1)}s)`;
-    feedbackEl.className = ''; // 清除舊 class
+    feedbackEl.className = ''; 
     feedbackEl.classList.add(textColorClass);
 
     document.getElementById('test-correct-msg').innerText = t('ans_prefix') + ans; 
