@@ -1,5 +1,6 @@
 const CHARS_ZH = ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ'];
-const CHARS_EN = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X'];
+// 內部維持小寫，但顯示時會轉大寫
+const CHARS_EN = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x'];
 let chars = [...CHARS_ZH];
 const STORAGE_KEY = 'bld_custom_dict_v3'; 
 const STATUS_KEY = 'bld_status_v1'; 
@@ -47,7 +48,7 @@ const translations = {
 const SM2_SETTINGS = {
     defaultEf: 2.5,
     minEf: 1.3,
-    intervals: [1, 3] // 第一級間隔1天，第二級間隔3天
+    intervals: [1, 3] 
 };
 
 function calculateNextReview(currentData, grade) {
@@ -58,12 +59,10 @@ function calculateNextReview(currentData, grade) {
     let nextInterval, nextRepetition, nextEf;
 
     if (grade < 3) {
-        // Fail
         nextRepetition = 0;
         nextInterval = 1; 
         nextEf = Math.max(SM2_SETTINGS.minEf, card.ef - 0.2);
     } else {
-        // Pass
         nextRepetition = card.repetition + 1;
         nextEf = card.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
         if (nextEf < SM2_SETTINGS.minEf) nextEf = SM2_SETTINGS.minEf;
@@ -75,16 +74,12 @@ function calculateNextReview(currentData, grade) {
 
     const nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
     
-    // --- 視覺化顏色判定 (基於動作) ---
     let nextColor = 'red';
     if (grade >= 4) {
-        // 5=Easy(按綠鈕), 4=Good(打字<8s) -> 顯示綠色
         nextColor = 'green';
     } else if (grade === 3) {
-        // 3=Hard(按黃鈕/打字8-12s) -> 顯示黃色
         nextColor = 'yellow';
     } else {
-        // 0~2=Fail(按紅鈕/打字太慢/錯誤) -> 顯示紅色
         nextColor = 'red';
     }
 
@@ -98,7 +93,6 @@ function getStatusMap() { return JSON.parse(localStorage.getItem(STATUS_KEY)) ||
 function getPairData(pair) {
     const map = getStatusMap();
     let data = map[pair];
-    // 兼容舊版字串資料
     if (typeof data === 'string') {
         return {
             interval: (data === 'green' ? 10 : (data === 'yellow' ? 3 : 0)), 
@@ -144,13 +138,14 @@ function init() {
 }
 
 function updateLayoutMode() {
-    if(chars.includes('A')) { document.body.classList.remove('mode-zh'); document.body.classList.add('mode-en'); } 
+    if(chars.includes('A') || chars.includes('a')) { document.body.classList.remove('mode-zh'); document.body.classList.add('mode-en'); } 
     else { document.body.classList.remove('mode-en'); document.body.classList.add('mode-zh'); }
 }
 
 function initUI() {
     const listSel = document.getElementById('char-select'); listSel.innerHTML = '';
-    chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c}`; listSel.appendChild(opt1); });
+    // 下拉選單大寫
+    chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c.toUpperCase()}`; listSel.appendChild(opt1); });
     renderCheckboxes('mem-range-grid', 'mem'); renderCheckboxes('test-range-grid', 'test');
     updateDropdownLabel('mem'); updateDropdownLabel('test');
 }
@@ -191,10 +186,10 @@ function renderList() {
         if (startChar === endChar) return; 
         const pair = startChar + endChar;
         const div = document.createElement('div'); div.className = 'pair-item';
-        div.innerHTML = `<div class="pair-label">${pair}</div>`;
+        // 列表模式標籤大寫
+        div.innerHTML = `<div class="pair-label">${pair.toUpperCase()}</div>`;
         const input = document.createElement('input'); input.className = 'pair-input';
         
-        // 使用新顏色判定
         const stColor = getPairColor(pair);
         if(stColor) input.classList.add(`status-${stColor}`);
 
@@ -210,12 +205,14 @@ function renderMatrix() {
     
     let html = '<thead><tr><th></th>';
     chars.forEach((c, index) => {
-        html += `<th><input value="${c}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
+        // [修改]: 上方表頭輸入框顯示值轉為大寫 (.toUpperCase())
+        html += `<th><input value="${c.toUpperCase()}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
     });
     html += '</tr></thead><tbody>';
 
     chars.forEach((rowChar, rowIndex) => {
-        html += `<tr><th><input value="${rowChar}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
+        // [修改]: 左側表頭輸入框顯示值轉為大寫 (.toUpperCase())
+        html += `<tr><th><input value="${rowChar.toUpperCase()}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
         chars.forEach((colChar, colIndex) => {
             const pair = rowChar + colChar;
             const stColor = getPairColor(pair);
@@ -266,7 +263,7 @@ function toggleLanguage() {
     currentLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
     localStorage.setItem(LANG_KEY, currentLang); applyLanguage();
     if (currentLang === 'en' && JSON.stringify(chars) === JSON.stringify(CHARS_ZH)) {
-        if(confirm("Switch to English A-X?")) { chars = [...CHARS_EN]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
+        if(confirm("Switch to English a-x?")) { chars = [...CHARS_EN]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
     } else if (currentLang === 'zh-TW' && JSON.stringify(chars) === JSON.stringify(CHARS_EN)) {
         if(confirm("切換回注音？")) { chars = [...CHARS_ZH]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
     }
@@ -275,7 +272,8 @@ function toggleLanguage() {
 function applyLanguage() {
     document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if(translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
     const listSel = document.getElementById('char-select'); const currentVal = listSel.value; listSel.innerHTML = ''; 
-    chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c}${t('opt_start')}`; listSel.appendChild(opt); });
+    // 下拉選單選項大寫
+    chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
     if(currentVal && chars.includes(currentVal)) listSel.value = currentVal; 
     if(isWaitingTestNext) document.getElementById('test-btn').innerText = t('btn_start_test'); else document.getElementById('test-btn').innerText = t('btn_submit');
     if(isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; else document.getElementById('mem-hint').style.visibility = 'visible';
@@ -285,7 +283,9 @@ function applyLanguage() {
 function toggleDropdown(prefix) { const content = document.getElementById(`${prefix}-dropdown-content`); const isShown = content.classList.contains('show'); closeAllDropdowns(); if (!isShown) content.classList.add('show'); }
 function closeAllDropdowns() { document.querySelectorAll('.dropdown-content').forEach(el => el.classList.remove('show')); }
 function updateDropdownLabel(prefix) { const selected = getSelectedRanges(prefix); const btn = document.getElementById(`${prefix}-dropdown-btn`); if (selected.length === chars.length) btn.innerText = t('sel_full'); else if (selected.length === 0) btn.innerText = t('sel_none'); else btn.innerText = selected.length <= 5 ? `${t('sel_prefix')}${selected.join(', ')}` : t('sel_count', {n: selected.length}); }
-function renderCheckboxes(containerId, prefix) { const container = document.getElementById(containerId); container.innerHTML = ''; chars.forEach((c) => { const label = document.createElement('label'); label.style = 'display:flex;align-items:center;'; const input = document.createElement('input'); input.type = 'checkbox'; input.value = c; input.name = prefix + '_range'; input.checked = true; input.onchange = () => updateDropdownLabel(prefix); label.appendChild(input); label.appendChild(document.createTextNode(c)); container.appendChild(label); }); }
+function renderCheckboxes(containerId, prefix) { const container = document.getElementById(containerId); container.innerHTML = ''; chars.forEach((c) => { const label = document.createElement('label'); label.style = 'display:flex;align-items:center;'; const input = document.createElement('input'); input.type = 'checkbox'; input.value = c; input.name = prefix + '_range'; input.checked = true; input.onchange = () => updateDropdownLabel(prefix); label.appendChild(input); 
+    // 核取方塊文字大寫
+    label.appendChild(document.createTextNode(c.toUpperCase())); container.appendChild(label); }); }
 function toggleAll(prefix, state) { document.querySelectorAll(`input[name="${prefix}_range"]`).forEach(input => input.checked = state); updateDropdownLabel(prefix); }
 function getSelectedRanges(prefix) { return Array.from(document.querySelectorAll(`input[name="${prefix}_range"]:checked`)).map(i => i.value); }
 function triggerAction(tabId) { if(tabId === 'view-memory') { if(isMemAnswerShown) nextMemoryCard(); else toggleMemoryAnswer(); } else if(tabId === 'view-test') { if(isWaitingTestNext) startTestQuestion(); } }
@@ -352,7 +352,8 @@ function nextMemoryCard() {
 
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastMemPair = currentPair; 
-    document.getElementById('mem-q').innerText = currentPair; 
+    // 記憶翻牌顯示大寫
+    document.getElementById('mem-q').innerText = currentPair.toUpperCase(); 
     document.getElementById('mem-a').classList.remove('show'); 
     isMemAnswerShown = false; applyLanguage(); 
 }
@@ -398,7 +399,8 @@ function startTestQuestion() {
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastTestPair = currentPair; 
     
-    document.getElementById('test-q').innerText = currentPair; 
+    // 測驗顯示大寫
+    document.getElementById('test-q').innerText = currentPair.toUpperCase(); 
     const inp = document.getElementById('test-input'); 
     inp.value = ''; inp.disabled = false; inp.focus(); 
     
@@ -431,7 +433,6 @@ function checkTestAnswer() {
     } else if(val !== ans) { 
         grade = 1; msg = t('fb_wrong'); textColorClass = 'text-danger';
     } else { 
-        // --- 根據你的 8s/12s 需求判定的 Grade ---
         if(duration < 8.0) { 
             grade = 5; msg = t('fb_good'); textColorClass = 'text-success';
         } else if(duration <= 12.0) { 
