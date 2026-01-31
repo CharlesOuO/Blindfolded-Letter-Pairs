@@ -199,7 +199,6 @@ body {
     vertical-align: middle;
 }
 
-/* 針對儲存格內的容器設定 */
 .matrix-table td { position: relative; }
 
 .matrix-table thead th { 
@@ -241,7 +240,7 @@ body {
 }
 
 .diagonal-wrapper { 
-    display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; 
+    display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; position: relative;
 }
 .diagonal-wrapper .matrix-input { 
     height: 60%; font-size: 12px; display: block; line-height: 22px; 
@@ -302,7 +301,6 @@ body {
     #test-input { width: 100%; max-width: none; }
 }
 
-/* --- [新增] 用於 SM-2 演算法回饋的文字顏色 --- */
 .text-success { color: #16a34a !important; }
 .text-warning { color: #b45309 !important; }
 .text-danger  { color: #dc2626 !important; }

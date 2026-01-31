@@ -186,16 +186,15 @@ function renderList() {
         if (startChar === endChar) return; 
         const pair = startChar + endChar;
         const div = document.createElement('div'); div.className = 'pair-item';
-        // 列表模式標籤大寫
         div.innerHTML = `<div class="pair-label">${pair.toUpperCase()}</div>`;
-        const input = document.createElement('input'); input.className = 'pair-input';
         
+        const input = document.createElement('input'); input.className = 'pair-input';
         const stColor = getPairColor(pair);
         if(stColor) input.classList.add(`status-${stColor}`);
-
         input.value = dict[pair] || "";
         input.oninput = function() { const d = getDict(); d[pair] = this.value.trim(); saveDict(d); };
-        div.appendChild(input); container.appendChild(div);
+        div.appendChild(input);
+        container.appendChild(div);
     });
 }
 
@@ -205,13 +204,11 @@ function renderMatrix() {
     
     let html = '<thead><tr><th></th>';
     chars.forEach((c, index) => {
-        // [修改]: 上方表頭輸入框顯示值轉為大寫 (.toUpperCase())
         html += `<th><input value="${c.toUpperCase()}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
     });
     html += '</tr></thead><tbody>';
 
     chars.forEach((rowChar, rowIndex) => {
-        // [修改]: 左側表頭輸入框顯示值轉為大寫 (.toUpperCase())
         html += `<tr><th><input value="${rowChar.toUpperCase()}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
         chars.forEach((colChar, colIndex) => {
             const pair = rowChar + colChar;
@@ -226,7 +223,9 @@ function renderMatrix() {
                     </div>
                 </td>`;
             } else {
-                html += `<td class="${cellClass}"><input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()"></td>`;
+                html += `<td class="${cellClass}">
+                    <input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()">
+                </td>`;
             }
         });
         html += '</tr>';
@@ -234,6 +233,7 @@ function renderMatrix() {
     html += '</tbody>';
     table.innerHTML = html;
 }
+
 
 window.handleFocus = function(el) {
     const td = el.closest('td'); if(!td) return;
@@ -272,19 +272,18 @@ function toggleLanguage() {
 function applyLanguage() {
     document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if(translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
     const listSel = document.getElementById('char-select'); const currentVal = listSel.value; listSel.innerHTML = ''; 
-    // 下拉選單選項大寫
     chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
     if(currentVal && chars.includes(currentVal)) listSel.value = currentVal; 
     if(isWaitingTestNext) document.getElementById('test-btn').innerText = t('btn_start_test'); else document.getElementById('test-btn').innerText = t('btn_submit');
     if(isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; else document.getElementById('mem-hint').style.visibility = 'visible';
     updateDropdownLabel('mem'); updateDropdownLabel('test');
+    if (!isMatrixMode) renderList(); 
 }
 
 function toggleDropdown(prefix) { const content = document.getElementById(`${prefix}-dropdown-content`); const isShown = content.classList.contains('show'); closeAllDropdowns(); if (!isShown) content.classList.add('show'); }
 function closeAllDropdowns() { document.querySelectorAll('.dropdown-content').forEach(el => el.classList.remove('show')); }
 function updateDropdownLabel(prefix) { const selected = getSelectedRanges(prefix); const btn = document.getElementById(`${prefix}-dropdown-btn`); if (selected.length === chars.length) btn.innerText = t('sel_full'); else if (selected.length === 0) btn.innerText = t('sel_none'); else btn.innerText = selected.length <= 5 ? `${t('sel_prefix')}${selected.join(', ')}` : t('sel_count', {n: selected.length}); }
 function renderCheckboxes(containerId, prefix) { const container = document.getElementById(containerId); container.innerHTML = ''; chars.forEach((c) => { const label = document.createElement('label'); label.style = 'display:flex;align-items:center;'; const input = document.createElement('input'); input.type = 'checkbox'; input.value = c; input.name = prefix + '_range'; input.checked = true; input.onchange = () => updateDropdownLabel(prefix); label.appendChild(input); 
-    // 核取方塊文字大寫
     label.appendChild(document.createTextNode(c.toUpperCase())); container.appendChild(label); }); }
 function toggleAll(prefix, state) { document.querySelectorAll(`input[name="${prefix}_range"]`).forEach(input => input.checked = state); updateDropdownLabel(prefix); }
 function getSelectedRanges(prefix) { return Array.from(document.querySelectorAll(`input[name="${prefix}_range"]:checked`)).map(i => i.value); }
@@ -325,6 +324,7 @@ function markMemStatus(gradeType) {
     nextMemoryCard();
 }
 
+// [修改] nextMemoryCard: 依據目前 chars 重新篩選候選字
 function nextMemoryCard() {
     const selectedChars = getSelectedRanges('mem'); 
     if(selectedChars.length === 0) { alert(t('alert_sel_range')); return; } 
@@ -333,8 +333,25 @@ function nextMemoryCard() {
 
     const dict = getDict();
     const now = Date.now();
-    let candidates = Object.keys(dict).filter(k => dict[k] && selectedChars.includes(k[0]));
     
+    // --- [核心修正] ---
+    let candidates = [];
+    chars.forEach(start => {
+        if (!selectedChars.includes(start)) return; 
+        chars.forEach(end => {
+            const pair = start + end;
+            if (dict[pair]) {
+                candidates.push(pair);
+            }
+        });
+    });
+    // ------------------
+
+    if (candidates.length === 0) {
+        alert(t('alert_no_data'));
+        return;
+    }
+
     let dueCards = [];
     let newCards = [];
     candidates.forEach(pair => {
@@ -352,30 +369,46 @@ function nextMemoryCard() {
 
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastMemPair = currentPair; 
-    // 記憶翻牌顯示大寫
+    
     document.getElementById('mem-q').innerText = currentPair.toUpperCase(); 
-    document.getElementById('mem-a').classList.remove('show'); 
+    document.getElementById('mem-a').classList.remove('show');
     isMemAnswerShown = false; applyLanguage(); 
 }
 
 function toggleMemoryAnswer() { 
     if(isMemAnswerShown) return; 
-    const word = getDict()[currentPair] || "N/A"; document.getElementById('mem-a').innerText = word; 
-    document.getElementById('mem-a').classList.add('show'); 
+    const dict = getDict();
+    const word = dict[currentPair] || "N/A"; 
+    const answerEl = document.getElementById('mem-a');
+    answerEl.innerText = word; 
+
+    answerEl.classList.add('show'); 
     document.getElementById('mem-grading-area').classList.remove('hidden');
     document.getElementById('mem-hint').style.visibility = 'hidden';
     isMemAnswerShown = true; applyLanguage(); 
 }
 
+// [修改] startTestQuestion: 依據目前 chars 重新篩選候選字
 function startTestQuestion() { 
     const dict = getDict(); 
-    const valid = Object.keys(dict).filter(k => dict[k]); 
-    if(valid.length === 0) return alert(t('alert_no_data')); 
     const selectedChars = getSelectedRanges('test'); 
     if(selectedChars.length === 0) return alert(t('alert_sel_range')); 
     
     const now = Date.now();
-    let candidates = valid.filter(p => selectedChars.includes(p[0])); 
+
+    // --- [核心修正] ---
+    let candidates = [];
+    chars.forEach(start => {
+        if (!selectedChars.includes(start)) return; 
+        chars.forEach(end => {
+            const pair = start + end;
+            if (dict[pair]) {
+                candidates.push(pair);
+            }
+        });
+    });
+    // ------------------
+
     if(candidates.length === 0) return alert(t('alert_no_data')); 
 
     let dueCards = [];
@@ -395,11 +428,12 @@ function startTestQuestion() {
     }
 
     if (pool.length > 1 && lastTestPair) pool = pool.filter(p => p !== lastTestPair); 
+    
+    if (pool.length === 0) return alert(t('alert_no_data'));
 
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastTestPair = currentPair; 
     
-    // 測驗顯示大寫
     document.getElementById('test-q').innerText = currentPair.toUpperCase(); 
     const inp = document.getElementById('test-input'); 
     inp.value = ''; inp.disabled = false; inp.focus(); 
@@ -422,7 +456,8 @@ function checkTestAnswer() {
     clearInterval(timerInterval); 
     const duration = (Date.now() - testStartTime) / 1000; 
     const val = document.getElementById('test-input').value.trim(); 
-    const ans = getDict()[currentPair]; 
+    const dict = getDict();
+    const ans = dict[currentPair]; 
     
     let grade = 0;
     let msg = '';
@@ -451,17 +486,45 @@ function checkTestAnswer() {
     feedbackEl.className = ''; 
     feedbackEl.classList.add(textColorClass);
 
-    document.getElementById('test-correct-msg').innerText = t('ans_prefix') + ans; 
+    const correctMsgEl = document.getElementById('test-correct-msg');
+    correctMsgEl.innerText = t('ans_prefix') + ans; 
+    
     document.getElementById('test-input').disabled = true; isWaitingTestNext = true; applyLanguage(); 
 }
 
+// [修改] exportData: 只匯出目前 chars 列表內存在的合法配對，自動過濾幽靈資料
 function exportData() { 
-    const blob = new Blob([JSON.stringify({ dict: getDict(), status: getStatusMap(), chars: chars })], {type: "application/json"}); 
+    const dict = getDict();
+    const statusMap = getStatusMap();
+    
+    // 建立乾淨的暫存物件
+    const cleanDict = {};
+    const cleanStatus = {};
+
+    // 雙層迴圈：只遍歷「目前」設定的代碼
+    chars.forEach(start => {
+        chars.forEach(end => {
+            const pair = start + end;
+            // 如果資料庫裡有這個配對，才加入匯出名單
+            if (dict[pair]) {
+                cleanDict[pair] = dict[pair];
+                if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
+            }
+        });
+    });
+
+    const blob = new Blob([JSON.stringify({ 
+        dict: cleanDict, 
+        status: cleanStatus, 
+        chars: chars
+    })], {type: "application/json"}); 
+    
     const url = URL.createObjectURL(blob); 
     const a = document.createElement('a'); 
     a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
     document.body.appendChild(a); a.click(); document.body.removeChild(a); 
 }
+
 function importData() { 
     const fileInput = document.getElementById('file-input'); 
     const f = fileInput.files[0]; 
@@ -470,7 +533,7 @@ function importData() {
             if(d.dict) { 
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict)); 
                 localStorage.setItem(STATUS_KEY, JSON.stringify(d.status || {})); 
-                if(d.chars) { chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); } 
+                if(d.chars) { chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); }
             } 
             alert(t('alert_import_success')); initUI(); updateLayoutMode(); 
             if(isMatrixMode) renderMatrix(); else renderList(); 
