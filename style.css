@@ -87,7 +87,7 @@ body {
 
 .hidden { display: none !important; }
 
-/* --- 核心卡片與控制面板 --- */
+/* --- Control Panel --- */
 .control-panel { 
     background: white; 
     padding: 20px; 
@@ -131,15 +131,68 @@ body {
     font-weight: 400; line-height: 1.2; color: #1e293b;
 }
 
+/* --- [修正] 記憶翻牌的答案區 (支援換行) --- */
 .answer-text {
-    font-size: 2.5rem; color: #dc2626; display: none;
-    font-weight: 700; margin: 10px 0 20px 0;
+    font-size: 2rem; 
+    color: #dc2626; 
+    display: none;
+    font-weight: 700; 
+    margin: 10px 0 20px 0;
+    
+    /* 換行設定 */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    line-height: 1.3;
+    padding: 0 15px;
 }
 .answer-text.show { display: block; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
 @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-/* --- 評分按鈕美化 --- */
+/* --- [修正] 測驗輸入框 (Textarea 樣式) --- */
+#test-input {
+    width: 90%;
+    max-width: 400px;
+    min-height: 60px;
+    padding: 10px;
+    font-size: 1.2rem;
+    text-align: center;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    outline: none;
+    background: #f8fafc;
+    
+    /* 換行與捲軸設定 */
+    resize: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    overflow-y: auto;
+    margin-top: 15px;
+}
+#test-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    background: #fff;
+}
+
+/* --- [修正] 測驗正確答案區 (支援換行) --- */
+#test-correct-msg {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    line-height: 1.4;
+    font-size: 1.2rem;
+    color: #16a34a;
+    margin-top: 10px;
+    padding: 0 10px;
+}
+
+
+/* --- Grading Buttons --- */
 .grading-btns {
     display: flex; justify-content: center; align-items: center;
     gap: 16px; margin-top: auto; width: 100%; padding-top: 20px;
@@ -198,7 +251,6 @@ body {
     transition: background-color 0.1s;
     vertical-align: middle;
 }
-
 .matrix-table td { position: relative; }
 
 .matrix-table thead th { 
@@ -230,7 +282,6 @@ body {
     box-shadow: inset 0 0 0 2px var(--primary-color); 
     font-weight: 600; 
 }
-
 .header-input { 
     width: 100%; height: 100%; background: transparent; border: none; 
     text-align: center; font-weight: 700; color: #334155; cursor: pointer; 
@@ -238,13 +289,10 @@ body {
     padding: 0; margin: 0; border-radius: 0; 
     display: block; line-height: var(--cell-height);
 }
-
 .diagonal-wrapper { 
     display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; position: relative;
 }
-.diagonal-wrapper .matrix-input { 
-    height: 60%; font-size: 12px; display: block; line-height: 22px; 
-}
+.diagonal-wrapper .matrix-input { height: 60%; font-size: 12px; display: block; line-height: 22px; }
 .btn-diagonal-check { 
     height: 40%; width: 100%; font-size: 10px; padding: 0; margin: 0; 
     border: none; border-top: 1px solid #e2e8f0; background: #f8fafc; 
@@ -292,7 +340,8 @@ body {
     .control-panel { padding: 15px; margin-bottom: 15px; max-width: 100%; }
     .card-area, .card-area-test { padding: 25px 15px; }
     .question { font-size: 4rem; }
-    .answer-text { font-size: 2rem; }
+    /* Mobile tweaks for wrapping text */
+    .answer-text { font-size: 1.5rem; }
     .pair-input, .matrix-input, #test-input { font-size: 16px; }
     .grid-container { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .btn-primary { width: 100%; padding: 14px; }

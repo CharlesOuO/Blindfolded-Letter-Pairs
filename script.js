@@ -1,7 +1,7 @@
 const CHARS_ZH = ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ'];
-// 內部維持小寫，但顯示時會轉大寫
 const CHARS_EN = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x'];
 let chars = [...CHARS_ZH];
+
 const STORAGE_KEY = 'bld_custom_dict_v3'; 
 const STATUS_KEY = 'bld_status_v1'; 
 const LANG_KEY = 'bld_lang_v1'; 
@@ -16,6 +16,21 @@ let lastMemPair = null;
 let lastTestPair = null;
 let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
 let isMatrixMode = false;
+
+// --- 優化工具: 防抖函數 (Debounce) ---
+const debounce = (fn, delay = 500) => {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn.apply(this, args), delay);
+    };
+};
+
+const savePairDataDebounced = debounce((pair, value) => {
+    const d = getDict();
+    d[pair] = value.trim();
+    saveDict(d);
+}, 500);
 
 const translations = {
     'zh-TW': {
@@ -44,77 +59,42 @@ const translations = {
     }
 };
 
-// --- SM-2 演算法與資料存取 ---
-const SM2_SETTINGS = {
-    defaultEf: 2.5,
-    minEf: 1.3,
-    intervals: [1, 3] 
-};
+const SM2_SETTINGS = { defaultEf: 2.5, minEf: 1.3, intervals: [1, 3] };
 
 function calculateNextReview(currentData, grade) {
     let card = (typeof currentData === 'object' && currentData !== null) ? currentData : {
         interval: 0, repetition: 0, ef: SM2_SETTINGS.defaultEf, dueDate: 0, color: 'red'
     };
-    
     let nextInterval, nextRepetition, nextEf;
-
     if (grade < 3) {
-        nextRepetition = 0;
-        nextInterval = 1; 
-        nextEf = Math.max(SM2_SETTINGS.minEf, card.ef - 0.2);
+        nextRepetition = 0; nextInterval = 1; nextEf = Math.max(SM2_SETTINGS.minEf, card.ef - 0.2);
     } else {
         nextRepetition = card.repetition + 1;
         nextEf = card.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
         if (nextEf < SM2_SETTINGS.minEf) nextEf = SM2_SETTINGS.minEf;
-
         if (nextRepetition === 1) nextInterval = SM2_SETTINGS.intervals[0];
         else if (nextRepetition === 2) nextInterval = SM2_SETTINGS.intervals[1];
         else nextInterval = Math.round(card.interval * nextEf);
     }
-
     const nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
-    
-    let nextColor = 'red';
-    if (grade >= 4) {
-        nextColor = 'green';
-    } else if (grade === 3) {
-        nextColor = 'yellow';
-    } else {
-        nextColor = 'red';
-    }
-
-    return {
-        interval: nextInterval, repetition: nextRepetition, ef: nextEf, dueDate: nextDueDate, color: nextColor
-    };
+    let nextColor = grade >= 4 ? 'green' : (grade === 3 ? 'yellow' : 'red');
+    return { interval: nextInterval, repetition: nextRepetition, ef: nextEf, dueDate: nextDueDate, color: nextColor };
 }
 
 function getStatusMap() { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; }
-
 function getPairData(pair) {
     const map = getStatusMap();
     let data = map[pair];
     if (typeof data === 'string') {
-        return {
-            interval: (data === 'green' ? 10 : (data === 'yellow' ? 3 : 0)), 
-            repetition: (data === 'green' ? 3 : 0),
-            ef: 2.5, dueDate: Date.now(), color: data
-        };
+        return { interval: (data==='green'?10:3), repetition: 1, ef: 2.5, dueDate: Date.now(), color: data };
     }
     return data || null;
 }
-
 function saveStatusData(pair, dataObject) {
-    const map = getStatusMap();
-    map[pair] = dataObject;
-    localStorage.setItem(STATUS_KEY, JSON.stringify(map));
+    const map = getStatusMap(); map[pair] = dataObject; localStorage.setItem(STATUS_KEY, JSON.stringify(map));
 }
+function getPairColor(pair) { const data = getPairData(pair); return data ? (data.color || 'red') : ''; }
 
-function getPairColor(pair) {
-    const data = getPairData(pair);
-    return data ? (data.color || 'red') : '';
-}
-
-// --- 核心功能 ---
 function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
 function getDict() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
 function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
@@ -123,18 +103,71 @@ function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
     initUI(); applyLanguage(); updateLayoutMode();
-    
+    setupEventListeners();
+}
+
+function setupEventListeners() {
     document.addEventListener('click', function(e) { if (!e.target.closest('.dropdown-wrapper')) { closeAllDropdowns(); } });
-    document.getElementById('test-input').addEventListener('keydown', function(e) { if(e.key === 'Enter') { e.stopPropagation(); checkTestAnswer(); } });
+    
+    // --- [核心修正] 攔截 Textarea 的 Enter 鍵 ---
+    const testInput = document.getElementById('test-input');
+    testInput.addEventListener('keydown', function(e) { 
+        if(e.key === 'Enter') { 
+            e.preventDefault(); // 阻止換行
+            e.stopPropagation(); 
+            checkTestAnswer(); 
+        } 
+    });
+    
     document.addEventListener('keydown', function(e) {
         const activeTab = document.querySelector('.view-section.active').id;
         if (e.code === 'Space' || e.key === 'Enter') {
             if(document.activeElement.tagName === 'INPUT' && !isWaitingTestNext && activeTab === 'view-test') return;
             if(document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'test-input') return; 
+            if(document.activeElement.tagName === 'TEXTAREA' && document.activeElement.id !== 'test-input') return; // 新增這行以防萬一
+            
             e.preventDefault(); triggerAction(activeTab);
         }
     });
-    renderList();
+
+    // List Mode Listeners
+    const listContainer = document.getElementById('grid-area');
+    listContainer.addEventListener('input', (e) => {
+        if (e.target.matches('.pair-input')) {
+            const pair = e.target.dataset.pair;
+            savePairDataDebounced(pair, e.target.value);
+        }
+    });
+
+    // Matrix Mode Listeners
+    const matrixContainer = document.getElementById('matrix-area');
+    matrixContainer.addEventListener('input', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            const pair = e.target.dataset.pair;
+            savePairDataDebounced(pair, e.target.value);
+        }
+    });
+    matrixContainer.addEventListener('focusin', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            handleMatrixFocus(e.target);
+        }
+    });
+    matrixContainer.addEventListener('focusout', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            handleMatrixBlur();
+        }
+    });
+    matrixContainer.addEventListener('click', (e) => {
+        if (e.target.matches('.btn-diagonal-check')) {
+            const pair = e.target.dataset.pair;
+            const char = e.target.dataset.char;
+            const input = e.target.previousElementSibling;
+            const d = getDict(); 
+            d[pair] = char; 
+            saveDict(d); 
+            input.value = char;
+        }
+    });
 }
 
 function updateLayoutMode() {
@@ -144,7 +177,6 @@ function updateLayoutMode() {
 
 function initUI() {
     const listSel = document.getElementById('char-select'); listSel.innerHTML = '';
-    // 下拉選單大寫
     chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c.toUpperCase()}`; listSel.appendChild(opt1); });
     renderCheckboxes('mem-range-grid', 'mem'); renderCheckboxes('test-range-grid', 'test');
     updateDropdownLabel('mem'); updateDropdownLabel('test');
@@ -182,76 +214,85 @@ function renderList() {
     const container = document.getElementById('grid-area');
     const dict = getDict();
     container.innerHTML = ''; 
+    const fragment = document.createDocumentFragment();
+
     chars.forEach((endChar) => {
         if (startChar === endChar) return; 
         const pair = startChar + endChar;
         const div = document.createElement('div'); div.className = 'pair-item';
         div.innerHTML = `<div class="pair-label">${pair.toUpperCase()}</div>`;
         
-        const input = document.createElement('input'); input.className = 'pair-input';
+        const input = document.createElement('input'); 
+        input.className = 'pair-input';
+        input.dataset.pair = pair;
+        
         const stColor = getPairColor(pair);
         if(stColor) input.classList.add(`status-${stColor}`);
         input.value = dict[pair] || "";
-        input.oninput = function() { const d = getDict(); d[pair] = this.value.trim(); saveDict(d); };
+        
         div.appendChild(input);
-        container.appendChild(div);
+        fragment.appendChild(div);
     });
+    container.appendChild(fragment);
 }
 
 function renderMatrix() {
     const table = document.getElementById('full-matrix');
     const dict = getDict();
+    const rows = [];
     
-    let html = '<thead><tr><th></th>';
+    let headerHtml = '<thead><tr><th></th>';
     chars.forEach((c, index) => {
-        html += `<th><input value="${c.toUpperCase()}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
+        headerHtml += `<th><input value="${c.toUpperCase()}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
     });
-    html += '</tr></thead><tbody>';
+    headerHtml += '</tr></thead><tbody>';
+    rows.push(headerHtml);
 
     chars.forEach((rowChar, rowIndex) => {
-        html += `<tr><th><input value="${rowChar.toUpperCase()}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
+        let rowHtml = `<tr><th><input value="${rowChar.toUpperCase()}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
         chars.forEach((colChar, colIndex) => {
             const pair = rowChar + colChar;
             const stColor = getPairColor(pair);
             let cellClass = stColor ? `status-${stColor}` : '';
+            const val = dict[pair] || '';
             
             if (rowChar === colChar) {
-                html += `<td class="cell-diagonal ${cellClass}">
+                rowHtml += `<td class="cell-diagonal ${cellClass}">
                     <div class="diagonal-wrapper">
-                        <input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()">
-                        <button class="btn-diagonal-check" onclick="fillSame('${pair}', '${rowChar}', this)">${t('btn_same')}</button>
+                        <input class="matrix-input" value="${val}" data-pair="${pair}">
+                        <button class="btn-diagonal-check" data-pair="${pair}" data-char="${rowChar}">${t('btn_same')}</button>
                     </div>
                 </td>`;
             } else {
-                html += `<td class="${cellClass}">
-                    <input class="matrix-input" value="${dict[pair]||''}" oninput="updateMatrixInput('${pair}', this.value)" onfocus="handleFocus(this)" onblur="handleBlur()">
+                rowHtml += `<td class="${cellClass}">
+                    <input class="matrix-input" value="${val}" data-pair="${pair}">
                 </td>`;
             }
         });
-        html += '</tr>';
+        rowHtml += '</tr>';
+        rows.push(rowHtml);
     });
-    html += '</tbody>';
-    table.innerHTML = html;
+    rows.push('</tbody>');
+    table.innerHTML = rows.join('');
 }
 
-
-window.handleFocus = function(el) {
+function handleMatrixFocus(el) {
     const td = el.closest('td'); if(!td) return;
     const tr = td.parentElement; const table = document.getElementById('full-matrix');
     if(!tr || !table) return;
     const colIndex = td.cellIndex; const rowIndex = tr.rowIndex;
-    for(let r = 0; r <= rowIndex; r++) { if(table.rows[r] && table.rows[r].cells[colIndex]) table.rows[r].cells[colIndex].classList.add('highlight-guide'); }
-    for(let c = 0; c <= colIndex; c++) { if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); }
-};
-window.handleBlur = function() { document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); };
+    for(let c = 0; c < tr.cells.length; c++) { if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); }
+    for(let r = 0; r < table.rows.length; r++) { if(table.rows[r] && table.rows[r].cells[colIndex]) { table.rows[r].cells[colIndex].classList.add('highlight-guide'); } }
+}
+
+function handleMatrixBlur() { document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); }
+
 window.updateGlobalChar = function(index, newValue) {
     const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
     chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
     document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
     initUI(); updateLayoutMode();
 };
-window.updateMatrixInput = function(pair, val) { const d = getDict(); d[pair] = val.trim(); saveDict(d); };
-window.fillSame = function(pair, char, btn) { const d = getDict(); d[pair] = char; saveDict(d); btn.previousElementSibling.value = char; };
 
 function resetDefaultChars() {
     if(confirm(t('alert_reset'))) {
@@ -313,58 +354,57 @@ function resetAllColors() {
 
 function markMemStatus(gradeType) {
     if (!currentPair) return;
-    let grade;
-    if (gradeType === 'red') grade = 1;
-    else if (gradeType === 'yellow') grade = 3;
-    else if (gradeType === 'green') grade = 5;
-    
+    let grade = gradeType === 'red' ? 1 : (gradeType === 'yellow' ? 3 : 5);
     const currentData = getPairData(currentPair);
     const newData = calculateNextReview(currentData, grade);
     saveStatusData(currentPair, newData);
     nextMemoryCard();
 }
 
-// [修改] nextMemoryCard: 依據目前 chars 重新篩選候選字
-function nextMemoryCard() {
-    const selectedChars = getSelectedRanges('mem'); 
-    if(selectedChars.length === 0) { alert(t('alert_sel_range')); return; } 
-    document.getElementById('mem-grading-area').classList.add('hidden');
-    document.getElementById('mem-hint').style.visibility = 'visible';
+function getCandidatePool(mode) {
+    const selectedChars = getSelectedRanges(mode); 
+    if(selectedChars.length === 0) return { error: 'alert_sel_range' }; 
 
     const dict = getDict();
     const now = Date.now();
-    
-    // --- [核心修正] ---
     let candidates = [];
+
     chars.forEach(start => {
         if (!selectedChars.includes(start)) return; 
         chars.forEach(end => {
             const pair = start + end;
-            if (dict[pair]) {
-                candidates.push(pair);
-            }
+            if (dict[pair]) candidates.push(pair);
         });
     });
-    // ------------------
 
-    if (candidates.length === 0) {
-        alert(t('alert_no_data'));
-        return;
-    }
+    if (candidates.length === 0) return { error: 'alert_no_data' };
 
     let dueCards = [];
     let newCards = [];
+    
     candidates.forEach(pair => {
         const data = getPairData(pair);
         if (!data) newCards.push(pair);
         else if (data.dueDate <= now) dueCards.push(pair);
     });
 
-    let pool = [];
-    if (dueCards.length > 0) pool = dueCards;
-    else if (newCards.length > 0) pool = newCards;
-    else pool = candidates;
+    if (mode === 'test') {
+        if (Math.random() < 0.8 && (dueCards.length > 0 || newCards.length > 0)) {
+            return { pool: dueCards.length > 0 ? dueCards : newCards };
+        }
+        return { pool: candidates };
+    } else {
+        if (dueCards.length > 0) return { pool: dueCards };
+        if (newCards.length > 0) return { pool: newCards };
+        return { pool: candidates };
+    }
+}
 
+function nextMemoryCard() {
+    const result = getCandidatePool('mem');
+    if (result.error) { alert(t(result.error)); return; }
+
+    let pool = result.pool;
     if (pool.length > 1 && lastMemPair) pool = pool.filter(p => p !== lastMemPair);
 
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
@@ -372,6 +412,9 @@ function nextMemoryCard() {
     
     document.getElementById('mem-q').innerText = currentPair.toUpperCase(); 
     document.getElementById('mem-a').classList.remove('show');
+    document.getElementById('mem-grading-area').classList.add('hidden');
+    document.getElementById('mem-hint').style.visibility = 'visible';
+    
     isMemAnswerShown = false; applyLanguage(); 
 }
 
@@ -388,49 +431,13 @@ function toggleMemoryAnswer() {
     isMemAnswerShown = true; applyLanguage(); 
 }
 
-// [修改] startTestQuestion: 依據目前 chars 重新篩選候選字
 function startTestQuestion() { 
-    const dict = getDict(); 
-    const selectedChars = getSelectedRanges('test'); 
-    if(selectedChars.length === 0) return alert(t('alert_sel_range')); 
-    
-    const now = Date.now();
+    const result = getCandidatePool('test');
+    if (result.error) { alert(t(result.error)); return; }
 
-    // --- [核心修正] ---
-    let candidates = [];
-    chars.forEach(start => {
-        if (!selectedChars.includes(start)) return; 
-        chars.forEach(end => {
-            const pair = start + end;
-            if (dict[pair]) {
-                candidates.push(pair);
-            }
-        });
-    });
-    // ------------------
-
-    if(candidates.length === 0) return alert(t('alert_no_data')); 
-
-    let dueCards = [];
-    let newCards = [];
-    candidates.forEach(pair => {
-        const data = getPairData(pair);
-        if (!data) newCards.push(pair);
-        else if (data.dueDate <= now) dueCards.push(pair);
-    });
-
-    let pool = [];
-    if (Math.random() < 0.8 && (dueCards.length > 0 || newCards.length > 0)) {
-        if (dueCards.length > 0) pool = dueCards;
-        else pool = newCards;
-    } else {
-        pool = candidates;
-    }
-
+    let pool = result.pool;
     if (pool.length > 1 && lastTestPair) pool = pool.filter(p => p !== lastTestPair); 
     
-    if (pool.length === 0) return alert(t('alert_no_data'));
-
     currentPair = pool[Math.floor(Math.random() * pool.length)]; 
     lastTestPair = currentPair; 
     
@@ -492,33 +499,23 @@ function checkTestAnswer() {
     document.getElementById('test-input').disabled = true; isWaitingTestNext = true; applyLanguage(); 
 }
 
-// [修改] exportData: 只匯出目前 chars 列表內存在的合法配對，自動過濾幽靈資料
 function exportData() { 
     const dict = getDict();
     const statusMap = getStatusMap();
-    
-    // 建立乾淨的暫存物件
     const cleanDict = {};
     const cleanStatus = {};
-
-    // 雙層迴圈：只遍歷「目前」設定的代碼
     chars.forEach(start => {
         chars.forEach(end => {
             const pair = start + end;
-            // 如果資料庫裡有這個配對，才加入匯出名單
             if (dict[pair]) {
                 cleanDict[pair] = dict[pair];
                 if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
             }
         });
     });
-
     const blob = new Blob([JSON.stringify({ 
-        dict: cleanDict, 
-        status: cleanStatus, 
-        chars: chars
+        dict: cleanDict, status: cleanStatus, chars: chars
     })], {type: "application/json"}); 
-    
     const url = URL.createObjectURL(blob); 
     const a = document.createElement('a'); 
     a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
