@@ -32,13 +32,24 @@ const savePairDataDebounced = debounce((pair, value) => {
     saveDict(d);
 }, 500);
 
+// --- [修正] 翻譯字典 (補上遺漏的標籤) ---
 const translations = {
     'zh-TW': {
         nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "資料備份",
-        lbl_start_char: "開頭代碼：", btn_reset_color: "🔄 重置所有顏色",
+        lbl_start_char: "開頭代碼：", btn_reset_color: "重置所有顏色",
         lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題 (Space)", btn_start_test: "開始測驗 (Space)", 
-        btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter", title_backup: "資料備份與還原", btn_export: "下載備份", 
-        btn_import: "確認匯入", btn_clear_all: "清空所有資料", hint_matrix_edit: "提示：點擊表頭可修改代碼",
+        btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter", 
+        
+        // 資料備份頁面
+        title_backup: "資料備份與還原", 
+        lbl_select_file: "匯入檔案：", // [補上這個]
+        btn_import: "確認匯入", 
+        btn_clear_all: "清空所有資料", 
+        opt_json: "系統備份檔 (.json)", 
+        opt_csv: "Excel 表格 (.csv)", 
+        btn_export_exec: "匯出資料",
+
+        hint_matrix_edit: "提示：點擊表頭可修改代碼",
         btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "全表模式", btn_same: "同",
         alert_chars_empty: "輸入不能為空！", alert_reset: "確定重置？", alert_reset_done: "已重置", 
         opt_start: " 開頭", sel_full: "全範圍", sel_none: "未選擇", sel_count: "已選 {n} 個", sel_prefix: "已選：",
@@ -47,10 +58,20 @@ const translations = {
     },
     'en': {
         nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Backup",
-        lbl_start_char: "Start Code:", btn_reset_color: "🔄 Reset Colors",
+        lbl_start_char: "Start Code:", btn_reset_color: "Reset Colors",
         lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next (Space)", btn_start_test: "Start Test (Space)",
-        btn_submit: "Submit (Enter)", ph_input: "Type & Enter", title_backup: "Backup & Restore", btn_export: "Download Backup",
-        btn_import: "Import", btn_clear_all: "Clear All Data", hint_matrix_edit: "Click header to edit code",
+        btn_submit: "Submit (Enter)", ph_input: "Type & Enter", 
+        
+        // Backup Page
+        title_backup: "Backup & Restore", 
+        lbl_select_file: "Import File:", // [Fixed Missing Tag]
+        btn_import: "Import", 
+        btn_clear_all: "Clear All Data", 
+        opt_json: "Backup File (.json)", 
+        opt_csv: "Excel Table (.csv)", 
+        btn_export_exec: "Export Data",
+
+        hint_matrix_edit: "Click header to edit code",
         btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Matrix Mode", btn_same: "Same",
         alert_chars_empty: "Cannot be empty!", alert_reset: "Are you sure?", alert_reset_done: "Reset done.",
         opt_start: " Start", sel_full: "All", sel_none: "None", sel_count: "{n} selected", sel_prefix: "Sel: ",
@@ -499,27 +520,61 @@ function checkTestAnswer() {
     document.getElementById('test-input').disabled = true; isWaitingTestNext = true; applyLanguage(); 
 }
 
-function exportData() { 
+function exportData() {
+    const exportType = document.getElementById('export-type').value;
     const dict = getDict();
-    const statusMap = getStatusMap();
-    const cleanDict = {};
-    const cleanStatus = {};
-    chars.forEach(start => {
-        chars.forEach(end => {
-            const pair = start + end;
-            if (dict[pair]) {
-                cleanDict[pair] = dict[pair];
-                if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
-            }
+
+    if (exportType === 'csv') {
+        let csvContent = "\ufeff"; 
+        csvContent += "," + chars.join(",") + "\n";
+        chars.forEach(rowChar => {
+            let row = [rowChar];
+            chars.forEach(colChar => {
+                const pair = rowChar + colChar;
+                if (rowChar === colChar) {
+                    row.push(""); 
+                } else {
+                    let val = dict[pair] || "";
+                    if (val.includes(",")) val = `"${val}"`; 
+                    row.push(val);
+                }
+            });
+            csvContent += row.join(",") + "\n";
         });
-    });
-    const blob = new Blob([JSON.stringify({ 
-        dict: cleanDict, status: cleanStatus, chars: chars
-    })], {type: "application/json"}); 
-    const url = URL.createObjectURL(blob); 
-    const a = document.createElement('a'); 
-    a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `letter_pairs_table_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } else {
+        const statusMap = getStatusMap();
+        const cleanDict = {};
+        const cleanStatus = {};
+        
+        chars.forEach(start => {
+            chars.forEach(end => {
+                const pair = start + end;
+                if (dict[pair]) {
+                    cleanDict[pair] = dict[pair];
+                    if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
+                }
+            });
+        });
+
+        const blob = new Blob([JSON.stringify({ 
+            dict: cleanDict, status: cleanStatus, chars: chars
+        })], {type: "application/json"}); 
+        
+        const url = URL.createObjectURL(blob); 
+        const a = document.createElement('a'); 
+        a.href = url; a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; 
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+    }
 }
 
 function importData() { 

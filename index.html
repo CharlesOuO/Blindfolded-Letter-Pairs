@@ -5,6 +5,141 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Letter Pairs Practice (SM-2)</title>
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* 資料備份區塊容器 */
+        .backup-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 10px 0;
+        }
+
+        /* 每一組功能的區塊 */
+        .backup-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .backup-group-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-left: 2px;
+        }
+
+        /* 匯出控制列：讓選單與按鈕等高並排 */
+        .export-controls {
+            display: flex;
+            gap: 10px;
+            height: 44px; /* 固定高度確保對齊 */
+        }
+
+        /* 美化下拉選單容器 */
+        .styled-select-wrapper {
+            flex: 2; /* 佔據較多空間 */
+            position: relative;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            transition: border-color 0.2s;
+        }
+        
+        .styled-select-wrapper:hover {
+            border-color: #94a3b8;
+        }
+
+        .styled-select {
+            width: 100%;
+            height: 100%;
+            padding: 0 12px;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            color: #334155;
+            outline: none;
+            cursor: pointer;
+            appearance: none; /* 隱藏預設箭頭 */
+            -webkit-appearance: none;
+        }
+
+        .select-arrow {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+
+        /* 匯出按鈕微調 */
+        .btn-export {
+            flex: 1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 500;
+            margin: 0 !important; /* 覆蓋可能的預設 margin */
+        }
+
+        /* 匯入區塊：卡片式風格 */
+        .import-card {
+            background-color: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .import-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .file-input {
+            flex: 1;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+
+        .btn-import {
+            height: 40px;
+            padding: 0 20px;
+            white-space: nowrap;
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .btn-import:active { transform: scale(0.98); }
+
+        /* 危險區域 (清空按鈕) */
+        .danger-zone {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #f1f5f9;
+        }
+        
+        .btn-full-danger {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body onload="init()">
     <div class="nav-bar">
@@ -126,21 +261,40 @@
 
         <div id="view-data" class="view-section">
             <div class="control-panel">
-                <h3 data-i18n="title_backup" style="margin-top:0;">資料備份</h3>
-                <div style="padding:20px 0;">
-                    <div class="control-row">
-                        <button class="action-btn" onclick="exportData()" data-i18n="btn_export" style="padding:10px 20px;">📥 下載備份 (.json)</button>
+                <h3 data-i18n="title_backup" style="margin-top:0; margin-bottom: 20px;">資料備份</h3>
+                
+                <div class="backup-container">
+                    
+                    <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="btn_export_exec">匯出資料</div>
+                        <div class="export-controls">
+                            <div class="styled-select-wrapper">
+                                <select id="export-type" class="styled-select">
+                                    <option value="json" data-i18n="opt_json">系統備份檔 (.json)</option>
+                                    <option value="csv" data-i18n="opt_csv">Excel 表格 (.csv)</option>
+                                </select>
+                                <span class="select-arrow">▼</span>
+                            </div>
+                            <button class="action-btn btn-export" onclick="exportData()">
+                                <span data-i18n="btn_export_exec">匯出資料</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div style="margin-top:10px; border-top:1px solid #eee; padding-top:20px; background:#f9fafb; border-radius:8px;">
-                    <label data-i18n="lbl_select_file" style="display:block; margin-bottom:10px; color:#64748b;">匯入檔案：</label>
-                    <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-                        <input type="file" id="file-input" accept=".json" style="border:1px solid #cbd5e1; padding:5px; border-radius:4px; background:white; width:100%; max-width:250px;">
-                        <button class="action-btn" onclick="importData()" style="color:#166534; border-color:#86efac; background:#dcfce7;" data-i18n="btn_import">確認匯入</button>
+
+                    <div class="backup-group">
+                        <div class="import-card">
+                            <label data-i18n="lbl_select_file" style="font-weight:500; color:#475569; width:100%;">匯入檔案：</label>
+                            <div class="import-controls" style="width:100%;">
+                                <input type="file" id="file-input" accept=".json" class="file-input">
+                                <button class="btn-import" onclick="importData()" data-i18n="btn_import">確認匯入</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div style="margin-top:40px;">
-                    <button class="btn-danger action-btn" onclick="clearAllData()" data-i18n="btn_clear_all">⚠️ 清空所有資料</button>
+
+                    <div class="danger-zone">
+                        <button class="btn-danger action-btn btn-full-danger" onclick="clearAllData()" data-i18n="btn_clear_all">⚠️ 清空所有資料</button>
+                    </div>
+
                 </div>
             </div>
         </div>
