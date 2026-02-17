@@ -1,35 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Letter Pairs Practice (SM-2)</title>
     <link rel="stylesheet" href="style.css">
-    
+
     <style>
         /* =========================================
            1. 列表模式：大卡片樣式 (List Mode Cards)
            ========================================= */
-        
+
         /* 網格容器：自動適應寬度，手機顯示少，電腦顯示多 */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 每張卡片至少 140px */
-            gap: 16px; /* 卡片之間的間距 */
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            /* 每張卡片至少 140px */
+            gap: 16px;
+            /* 卡片之間的間距 */
             padding: 10px 0;
         }
 
         /* 單張卡片設計 */
         .pair-item {
             background: white;
-            border-radius: 16px; /* 圓角 */
+            border-radius: 16px;
+            /* 圓角 */
             padding: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); /* 陰影 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            /* 陰影 */
             border: 1px solid #f1f5f9;
             transition: transform 0.2s, box-shadow 0.2s;
         }
@@ -42,7 +47,8 @@
 
         /* 代碼文字 (例如 AB) */
         .pair-label {
-            font-size: 2rem; /* 字體放大 */
+            font-size: 2rem;
+            /* 字體放大 */
             font-weight: 800;
             color: #334155;
             letter-spacing: 1px;
@@ -69,9 +75,23 @@
         }
 
         /* 狀態顏色 (搭配 JS 邏輯) */
-        .pair-input.status-green { border-color: #86efac; background-color: #f0fdf4; color: #15803d; }
-        .pair-input.status-yellow { border-color: #fde047; background-color: #fefce8; color: #a16207; }
-        .pair-input.status-red { border-color: #fca5a5; background-color: #fef2f2; color: #b91c1c; }
+        .pair-input.status-green {
+            border-color: #86efac;
+            background-color: #f0fdf4;
+            color: #15803d;
+        }
+
+        .pair-input.status-yellow {
+            border-color: #fde047;
+            background-color: #fefce8;
+            color: #a16207;
+        }
+
+        .pair-input.status-red {
+            border-color: #fca5a5;
+            background-color: #fef2f2;
+            color: #b91c1c;
+        }
 
 
         /* =========================================
@@ -111,8 +131,10 @@
             border: 1px solid #cbd5e1;
             transition: border-color 0.2s;
         }
-        
-        .styled-select-wrapper:hover { border-color: #94a3b8; }
+
+        .styled-select-wrapper:hover {
+            border-color: #94a3b8;
+        }
 
         .styled-select {
             width: 100%;
@@ -151,7 +173,7 @@
 
         .import-card {
             background-color: #f8fafc;
-            border: 1px dashed #cbd5e1;
+            border: 1px solid #cbd5e1;
             border-radius: 12px;
             padding: 16px;
             display: flex;
@@ -186,14 +208,17 @@
             font-weight: 500;
             cursor: pointer;
         }
-        .btn-import:active { transform: scale(0.98); }
+
+        .btn-import:active {
+            transform: scale(0.98);
+        }
 
         .danger-zone {
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid #f1f5f9;
         }
-        
+
         .btn-full-danger {
             width: 100%;
             padding: 12px;
@@ -202,6 +227,7 @@
         }
     </style>
 </head>
+
 <body onload="init()">
     <div class="nav-bar">
         <div class="nav-container">
@@ -213,37 +239,42 @@
     </div>
 
     <div id="main-container" class="container">
-        
+
         <div id="view-list" class="view-section active">
             <div class="control-panel">
                 <div class="control-row" style="margin-bottom: 16px;">
-                    <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')" style="border-color:var(--primary-color); color:var(--primary-color);">📋 <span data-i18n="mode_card">列表模式</span></button>
-                    <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')">▦ <span data-i18n="mode_matrix">全表模式</span></button>
+                    <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')"
+                        style="border-color:var(--primary-color); color:var(--primary-color);">📋 <span
+                            data-i18n="mode_card">列表模式</span></button>
+                    <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')">▦ <span
+                            data-i18n="mode_matrix">全表模式</span></button>
                 </div>
-                
+
                 <div id="list-mode-controls">
                     <div class="control-row">
                         <label data-i18n="lbl_start_char" style="font-weight:500;">開頭：</label>
-                        <select id="char-select" onchange="renderList()" style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; outline:none; font-size:16px; cursor: pointer;"></select>
+                        <select id="char-select" onchange="renderList()"
+                            style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; outline:none; font-size:16px; cursor: pointer;"></select>
                     </div>
                 </div>
-                
+
                 <div id="matrix-settings" class="hidden">
                     <div class="control-row" style="gap: 15px;">
                         <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
                         <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">回復預設</button>
                     </div>
                 </div>
-                
+
                 <div style="margin-top: 16px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
                     <div class="control-row">
-                        <button class="action-btn" onclick="resetAllColors()" style="font-size: 0.85rem; color: #64748b;" data-i18n="btn_reset_color">🔄 重置所有顏色</button>
+                        <button class="action-btn" onclick="resetAllColors()"
+                            style="font-size: 0.85rem; color: #64748b;" data-i18n="btn_reset_color">🔄 重置所有顏色</button>
                     </div>
                 </div>
             </div>
 
             <div id="grid-area" class="grid-container"></div>
-            
+
             <div id="matrix-area" class="matrix-wrapper hidden">
                 <table id="full-matrix" class="matrix-table"></table>
             </div>
@@ -254,9 +285,11 @@
                 <div class="control-row">
                     <label data-i18n="lbl_range" style="font-weight:500;">範圍：</label>
                     <div class="dropdown-wrapper">
-                        <button id="mem-dropdown-btn" onclick="toggleDropdown('mem')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <button id="mem-dropdown-btn" onclick="toggleDropdown('mem')" class="action-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="mem-dropdown-content">
-                            <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                            <div
+                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
                                 <button class="btn-sm" onclick="toggleAll('mem', true)" style="flex:1;">全選</button>
                                 <button class="btn-sm" onclick="toggleAll('mem', false)" style="flex:1;">全消</button>
                             </div>
@@ -269,24 +302,28 @@
             <div class="card-area" onclick="toggleMemoryAnswer()">
                 <div class="question" id="mem-q">FO</div>
                 <div class="answer-text" id="mem-a">...</div>
-                
-                <div style="color:#94a3b8; font-size:0.9rem; margin-top:10px; min-height: 20px;" id="mem-hint" data-i18n="hint_click_flip">點擊卡片翻牌</div>
+
+                <div style="color:#94a3b8; font-size:0.9rem; margin-top:10px; min-height: 20px;" id="mem-hint"
+                    data-i18n="hint_click_flip">點擊卡片翻牌</div>
 
                 <div id="mem-grading-area" class="grading-btns hidden">
                     <button class="grading-btn btn-grade-red" onclick="event.stopPropagation(); markMemStatus('red')">
                         <span data-i18n="fb_wrong">不熟</span>
                     </button>
-                    <button class="grading-btn btn-grade-yellow" onclick="event.stopPropagation(); markMemStatus('yellow')">
+                    <button class="grading-btn btn-grade-yellow"
+                        onclick="event.stopPropagation(); markMemStatus('yellow')">
                         <span data-i18n="fb_slow">猶豫</span>
                     </button>
-                    <button class="grading-btn btn-grade-green" onclick="event.stopPropagation(); markMemStatus('green')">
+                    <button class="grading-btn btn-grade-green"
+                        onclick="event.stopPropagation(); markMemStatus('green')">
                         <span data-i18n="fb_good">熟練</span>
                     </button>
                 </div>
             </div>
-            
+
             <div style="text-align:center; margin-bottom:20px;">
-                <button class="btn-ghost" onclick="nextMemoryCard()" id="btn-next-mem" data-i18n="btn_next">下一題 (Space)</button>
+                <button class="btn-ghost" onclick="nextMemoryCard()" id="btn-next-mem" data-i18n="btn_next">下一題
+                    (Space)</button>
             </div>
         </div>
 
@@ -295,9 +332,11 @@
                 <div class="control-row">
                     <label data-i18n="lbl_test_range" style="font-weight:500;">範圍：</label>
                     <div class="dropdown-wrapper">
-                        <button id="test-dropdown-btn" onclick="toggleDropdown('test')" class="action-btn" style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <button id="test-dropdown-btn" onclick="toggleDropdown('test')" class="action-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="test-dropdown-content">
-                            <div style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                            <div
+                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
                                 <button class="btn-sm" onclick="toggleAll('test', true)" style="flex:1;">全選</button>
                                 <button class="btn-sm" onclick="toggleAll('test', false)" style="flex:1;">全消</button>
                             </div>
@@ -307,25 +346,29 @@
                 </div>
             </div>
             <div class="card-area-test">
-                <div id="timer" style="font-family:monospace; font-size:1.5rem; margin-bottom:15px; color:#64748b; background:#f1f5f9; display:inline-block; padding:5px 15px; border-radius:20px;">0.0s</div>
+                <div id="timer"
+                    style="font-family:monospace; font-size:1.5rem; margin-bottom:15px; color:#64748b; background:#f1f5f9; display:inline-block; padding:5px 15px; border-radius:20px;">
+                    0.0s</div>
                 <div class="question" id="test-q">?</div>
-                
+
                 <textarea id="test-input" placeholder="Type here"></textarea>
-                
-                <div id="test-feedback" style="margin-top:20px; font-weight:bold; min-height:28px; font-size:1.1rem;"></div>
+
+                <div id="test-feedback" style="margin-top:20px; font-weight:bold; min-height:28px; font-size:1.1rem;">
+                </div>
                 <div id="test-correct-msg" style="margin-top:5px; min-height:28px;"></div>
             </div>
             <div style="text-align:center; margin-bottom:20px; margin-top:20px;">
-                <button class="btn-primary" id="test-btn" onclick="startTestQuestion()" data-i18n="btn_start_test">開始測驗 (Space)</button>
+                <button class="btn-primary" id="test-btn" onclick="startTestQuestion()" data-i18n="btn_start_test">開始測驗
+                    (Space)</button>
             </div>
         </div>
 
         <div id="view-data" class="view-section">
             <div class="control-panel">
                 <h3 data-i18n="title_backup" style="margin-top:0; margin-bottom: 20px;">資料備份</h3>
-                
+
                 <div class="backup-container">
-                    
+
                     <div class="backup-group">
                         <div class="backup-group-label" data-i18n="btn_export_exec">匯出資料</div>
                         <div class="export-controls">
@@ -344,7 +387,8 @@
 
                     <div class="backup-group">
                         <div class="import-card">
-                            <label data-i18n="lbl_select_file" style="font-weight:500; color:#475569; width:100%;">匯入檔案：</label>
+                            <label data-i18n="lbl_select_file"
+                                style="font-weight:500; color:#475569; width:100%;">匯入檔案：</label>
                             <div class="import-controls" style="width:100%;">
                                 <input type="file" id="file-input" accept=".json" class="file-input">
                                 <button class="btn-import" onclick="importData()" data-i18n="btn_import">確認匯入</button>
@@ -353,7 +397,8 @@
                     </div>
 
                     <div class="danger-zone">
-                        <button class="btn-danger action-btn btn-full-danger" onclick="clearAllData()" data-i18n="btn_clear_all">⚠️ 清空所有資料</button>
+                        <button class="btn-danger action-btn btn-full-danger" onclick="clearAllData()"
+                            data-i18n="btn_clear_all">⚠️ 清空所有資料</button>
                     </div>
 
                 </div>
@@ -363,15 +408,31 @@
 
     <footer class="main-footer">
         <div class="social-icons">
-            <a href="https://www.worldcubeassociation.org/persons/2020LINC05" target="_blank" class="icon-link"><svg viewBox="0 0 24 24"><path d="M12.0003 2.50815L2.8374 7.11885L12.0003 12.3331L21.1631 7.11885L12.0003 2.50815ZM1.64209 8.65082V16.892L10.893 22.091V13.8499L1.64209 8.65082ZM13.1075 13.8499V22.091L22.3584 16.892V8.65082L13.1075 13.8499Z"/></svg></a>
-            <a href="https://www.instagram.com/chihjialin/" target="_blank" class="icon-link"><svg viewBox="0 0 24 24"><path d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M17.25,5.5A1.25,1.25 0 0,1 18.5,6.75A1.25,1.25 0 0,1 17.25,8A1.25,1.25 0 0,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" /></svg></a>
-            <a href="https://github.com/CharlesOuO" target="_blank" class="icon-link"><svg viewBox="0 0 24 24"><path d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z" /></svg></a>
-            <a href="mailto:your-email@example.com" class="icon-link"><svg viewBox="0 0 24 24"><path d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" /></svg></a>
+            <a href="https://www.worldcubeassociation.org/persons/2020LINC05" target="_blank" class="icon-link"><svg
+                    viewBox="0 0 24 24">
+                    <path
+                        d="M12.0003 2.50815L2.8374 7.11885L12.0003 12.3331L21.1631 7.11885L12.0003 2.50815ZM1.64209 8.65082V16.892L10.893 22.091V13.8499L1.64209 8.65082ZM13.1075 13.8499V22.091L22.3584 16.892V8.65082L13.1075 13.8499Z" />
+                </svg></a>
+            <a href="https://www.instagram.com/chihjialin/" target="_blank" class="icon-link"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M17.25,5.5A1.25,1.25 0 0,1 18.5,6.75A1.25,1.25 0 0,1 17.25,8A1.25,1.25 0 0,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
+                </svg></a>
+            <a href="https://github.com/CharlesOuO" target="_blank" class="icon-link"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z" />
+                </svg></a>
+            <a href="mailto:your-email@example.com" class="icon-link"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
+                </svg></a>
         </div>
         <div style="margin-bottom:8px;">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
-        <button onclick="toggleLanguage()" style="background:transparent; border:1px solid #64748b; color:#94a3b8; border-radius:20px; padding:4px 12px; cursor:pointer; font-size:0.8rem; transition:0.2s;">English / 中文</button>
+        <button onclick="toggleLanguage()"
+            style="background:transparent; border:1px solid #64748b; color:#94a3b8; border-radius:20px; padding:4px 12px; cursor:pointer; font-size:0.8rem; transition:0.2s;">English
+            / 中文</button>
     </footer>
-    
+
     <script src="script.js"></script>
 </body>
+
 </html>
