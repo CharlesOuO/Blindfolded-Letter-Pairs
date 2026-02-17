@@ -7,7 +7,76 @@
     <link rel="stylesheet" href="style.css">
     
     <style>
-        /* 資料備份區塊容器 */
+        /* =========================================
+           1. 列表模式：大卡片樣式 (List Mode Cards)
+           ========================================= */
+        
+        /* 網格容器：自動適應寬度，手機顯示少，電腦顯示多 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 每張卡片至少 140px */
+            gap: 16px; /* 卡片之間的間距 */
+            padding: 10px 0;
+        }
+
+        /* 單張卡片設計 */
+        .pair-item {
+            background: white;
+            border-radius: 16px; /* 圓角 */
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); /* 陰影 */
+            border: 1px solid #f1f5f9;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        /* 滑鼠移過去會有浮起來的效果 */
+        .pair-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 代碼文字 (例如 AB) */
+        .pair-label {
+            font-size: 2rem; /* 字體放大 */
+            font-weight: 800;
+            color: #334155;
+            letter-spacing: 1px;
+        }
+
+        /* 輸入框美化 */
+        .pair-input {
+            width: 100%;
+            text-align: center;
+            font-size: 1.1rem;
+            padding: 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            color: #475569;
+            outline: none;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        /* 輸入框獲取焦點時 */
+        .pair-input:focus {
+            border-color: var(--primary-color, #3b82f6);
+            background-color: white;
+        }
+
+        /* 狀態顏色 (搭配 JS 邏輯) */
+        .pair-input.status-green { border-color: #86efac; background-color: #f0fdf4; color: #15803d; }
+        .pair-input.status-yellow { border-color: #fde047; background-color: #fefce8; color: #a16207; }
+        .pair-input.status-red { border-color: #fca5a5; background-color: #fef2f2; color: #b91c1c; }
+
+
+        /* =========================================
+           2. 資料備份區塊樣式 (Backup UI)
+           ========================================= */
         .backup-container {
             display: flex;
             flex-direction: column;
@@ -15,7 +84,6 @@
             padding: 10px 0;
         }
 
-        /* 每一組功能的區塊 */
         .backup-group {
             display: flex;
             flex-direction: column;
@@ -29,16 +97,14 @@
             margin-left: 2px;
         }
 
-        /* 匯出控制列：讓選單與按鈕等高並排 */
         .export-controls {
             display: flex;
             gap: 10px;
-            height: 44px; /* 固定高度確保對齊 */
+            height: 44px;
         }
 
-        /* 美化下拉選單容器 */
         .styled-select-wrapper {
-            flex: 2; /* 佔據較多空間 */
+            flex: 2;
             position: relative;
             background: white;
             border-radius: 8px;
@@ -46,9 +112,7 @@
             transition: border-color 0.2s;
         }
         
-        .styled-select-wrapper:hover {
-            border-color: #94a3b8;
-        }
+        .styled-select-wrapper:hover { border-color: #94a3b8; }
 
         .styled-select {
             width: 100%;
@@ -60,7 +124,7 @@
             color: #334155;
             outline: none;
             cursor: pointer;
-            appearance: none; /* 隱藏預設箭頭 */
+            appearance: none;
             -webkit-appearance: none;
         }
 
@@ -74,7 +138,6 @@
             font-size: 0.8rem;
         }
 
-        /* 匯出按鈕微調 */
         .btn-export {
             flex: 1;
             border-radius: 8px;
@@ -83,10 +146,9 @@
             justify-content: center;
             gap: 6px;
             font-weight: 500;
-            margin: 0 !important; /* 覆蓋可能的預設 margin */
+            margin: 0 !important;
         }
 
-        /* 匯入區塊：卡片式風格 */
         .import-card {
             background-color: #f8fafc;
             border: 1px dashed #cbd5e1;
@@ -126,7 +188,6 @@
         }
         .btn-import:active { transform: scale(0.98); }
 
-        /* 危險區域 (清空按鈕) */
         .danger-zone {
             margin-top: 20px;
             padding-top: 20px;
@@ -276,7 +337,7 @@
                                 <span class="select-arrow">▼</span>
                             </div>
                             <button class="action-btn btn-export" onclick="exportData()">
-                                <span data-i18n="btn_export_exec">匯出資料</span>
+                                📥 <span data-i18n="btn_export_exec">匯出資料</span>
                             </button>
                         </div>
                     </div>

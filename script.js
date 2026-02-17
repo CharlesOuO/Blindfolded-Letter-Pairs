@@ -17,6 +17,9 @@ let lastTestPair = null;
 let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
 let isMatrixMode = false;
 
+// --- [新增] 矩陣模式目前選中的配對 ---
+let currentMatrixPair = null; 
+
 // --- 優化工具: 防抖函數 (Debounce) ---
 const debounce = (fn, delay = 500) => {
     let timeoutId;
@@ -32,23 +35,14 @@ const savePairDataDebounced = debounce((pair, value) => {
     saveDict(d);
 }, 500);
 
-// --- [修正] 翻譯字典 (補上遺漏的標籤) ---
 const translations = {
     'zh-TW': {
         nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "資料備份",
-        lbl_start_char: "開頭代碼：", btn_reset_color: "重置所有顏色",
+        lbl_start_char: "開頭代碼：", btn_reset_color: "🔄 重置所有顏色",
         lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題 (Space)", btn_start_test: "開始測驗 (Space)", 
         btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter", 
-        
-        // 資料備份頁面
-        title_backup: "資料備份與還原", 
-        lbl_select_file: "匯入檔案：", // [補上這個]
-        btn_import: "確認匯入", 
-        btn_clear_all: "清空所有資料", 
-        opt_json: "系統備份檔 (.json)", 
-        opt_csv: "Excel 表格 (.csv)", 
-        btn_export_exec: "匯出資料",
-
+        title_backup: "資料備份與還原", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料", 
+        opt_json: "系統備份檔 (.json)", opt_csv: "Excel 表格 (.csv)", btn_export_exec: "匯出資料",
         hint_matrix_edit: "提示：點擊表頭可修改代碼",
         btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "全表模式", btn_same: "同",
         alert_chars_empty: "輸入不能為空！", alert_reset: "確定重置？", alert_reset_done: "已重置", 
@@ -58,19 +52,11 @@ const translations = {
     },
     'en': {
         nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Backup",
-        lbl_start_char: "Start Code:", btn_reset_color: "Reset Colors",
+        lbl_start_char: "Start Code:", btn_reset_color: "🔄 Reset Colors",
         lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next (Space)", btn_start_test: "Start Test (Space)",
         btn_submit: "Submit (Enter)", ph_input: "Type & Enter", 
-        
-        // Backup Page
-        title_backup: "Backup & Restore", 
-        lbl_select_file: "Import File:", // [Fixed Missing Tag]
-        btn_import: "Import", 
-        btn_clear_all: "Clear All Data", 
-        opt_json: "Backup File (.json)", 
-        opt_csv: "Excel Table (.csv)", 
-        btn_export_exec: "Export Data",
-
+        title_backup: "Backup & Restore", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data", 
+        opt_json: "Backup File (.json)", opt_csv: "Excel Table (.csv)", btn_export_exec: "Export Data",
         hint_matrix_edit: "Click header to edit code",
         btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Matrix Mode", btn_same: "Same",
         alert_chars_empty: "Cannot be empty!", alert_reset: "Are you sure?", alert_reset_done: "Reset done.",
@@ -130,11 +116,10 @@ function init() {
 function setupEventListeners() {
     document.addEventListener('click', function(e) { if (!e.target.closest('.dropdown-wrapper')) { closeAllDropdowns(); } });
     
-    // --- [核心修正] 攔截 Textarea 的 Enter 鍵 ---
     const testInput = document.getElementById('test-input');
     testInput.addEventListener('keydown', function(e) { 
         if(e.key === 'Enter') { 
-            e.preventDefault(); // 阻止換行
+            e.preventDefault(); 
             e.stopPropagation(); 
             checkTestAnswer(); 
         } 
@@ -145,13 +130,11 @@ function setupEventListeners() {
         if (e.code === 'Space' || e.key === 'Enter') {
             if(document.activeElement.tagName === 'INPUT' && !isWaitingTestNext && activeTab === 'view-test') return;
             if(document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'test-input') return; 
-            if(document.activeElement.tagName === 'TEXTAREA' && document.activeElement.id !== 'test-input') return; // 新增這行以防萬一
-            
+            if(document.activeElement.tagName === 'TEXTAREA' && document.activeElement.id !== 'test-input') return; 
             e.preventDefault(); triggerAction(activeTab);
         }
     });
 
-    // List Mode Listeners
     const listContainer = document.getElementById('grid-area');
     listContainer.addEventListener('input', (e) => {
         if (e.target.matches('.pair-input')) {
@@ -160,7 +143,6 @@ function setupEventListeners() {
         }
     });
 
-    // Matrix Mode Listeners
     const matrixContainer = document.getElementById('matrix-area');
     matrixContainer.addEventListener('input', (e) => {
         if (e.target.matches('.matrix-input')) {
@@ -297,16 +279,75 @@ function renderMatrix() {
     table.innerHTML = rows.join('');
 }
 
+// --- [核心修改] 矩陣聚焦邏輯 ---
 function handleMatrixFocus(el) {
+    const pair = el.dataset.pair;
+    if (!pair) return;
+
+    currentMatrixPair = pair;
+
+    // 1. 啟用工具列
+    const toolbar = document.getElementById('matrix-grading-box');
+    if (toolbar) {
+        toolbar.style.opacity = "1";
+        toolbar.style.pointerEvents = "auto";
+        document.getElementById('active-pair-label').innerText = `${pair.toUpperCase()}`;
+    }
+
+    // 2. 表格十字高亮 (保持原樣)
     const td = el.closest('td'); if(!td) return;
     const tr = td.parentElement; const table = document.getElementById('full-matrix');
     if(!tr || !table) return;
-    const colIndex = td.cellIndex; const rowIndex = tr.rowIndex;
+    const colIndex = td.cellIndex; 
     for(let c = 0; c < tr.cells.length; c++) { if(tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); }
     for(let r = 0; r < table.rows.length; r++) { if(table.rows[r] && table.rows[r].cells[colIndex]) { table.rows[r].cells[colIndex].classList.add('highlight-guide'); } }
 }
 
-function handleMatrixBlur() { document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); }
+function handleMatrixBlur() { 
+    document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide')); 
+    // 不隱藏工具列，方便連續操作
+}
+
+// --- [新增] 手動設定狀態功能 (含隱藏) ---
+window.setMatrixStatus = function(statusType) {
+    if (!currentMatrixPair) {
+        alert("請先點選矩陣中的格子！");
+        return;
+    }
+
+    let newData;
+    if (statusType === 'gray') {
+        // 隱藏狀態：設為特殊顏色，並不會被 SM-2 安排複習
+        newData = { interval: -1, repetition: 0, ef: 2.5, dueDate: 0, color: 'gray' };
+    } else {
+        // 手動評分：模擬 SM-2 邏輯
+        const grade = statusType === 'green' ? 5 : (statusType === 'yellow' ? 3 : 1);
+        const currentData = getPairData(currentMatrixPair);
+        newData = calculateNextReview(currentData, grade);
+    }
+    
+    // 儲存並更新畫面
+    saveStatusData(currentMatrixPair, newData);
+    
+    // 即時更新該格子的顏色 class (不需重繪整個表格)
+    const inputEl = document.querySelector(`.matrix-input[data-pair="${currentMatrixPair}"]`);
+    if (inputEl) {
+        const td = inputEl.closest('td');
+        if (td) {
+            td.className = ''; // 清除舊顏色
+            if (newData.color) td.classList.add(`status-${newData.color}`);
+            if (currentMatrixPair[0] === currentMatrixPair[1]) td.classList.add('cell-diagonal');
+        }
+    }
+    
+    // 讓使用者知道成功了 (可選：讓工具列閃一下)
+    const label = document.getElementById('active-pair-label');
+    if (label) {
+        const originalText = label.innerText;
+        label.innerText = "已更新!";
+        setTimeout(() => label.innerText = originalText, 800);
+    }
+};
 
 window.updateGlobalChar = function(index, newValue) {
     const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
@@ -394,6 +435,10 @@ function getCandidatePool(mode) {
         if (!selectedChars.includes(start)) return; 
         chars.forEach(end => {
             const pair = start + end;
+            // [修改] 如果狀態是 'gray' (隱藏)，則完全不加入候選名單
+            const status = getPairData(pair);
+            if (status && status.color === 'gray') return;
+
             if (dict[pair]) candidates.push(pair);
         });
     });
