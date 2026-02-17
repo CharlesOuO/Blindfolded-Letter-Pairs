@@ -259,18 +259,25 @@
                 </div>
 
                 <div id="matrix-settings" class="hidden">
-                    <div class="control-row" style="gap: 15px;">
+                    <div class="control-row" style="gap: 15px; margin-bottom: 12px;">
                         <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
+                        <span id="active-pair-label"
+                            style="font-weight:bold; color:var(--primary-color); margin-left:10px;"></span>
                         <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">回復預設</button>
+                    </div>
+                    <div class="control-row" style="gap: 8px;">
+                        <button class="btn-grade bg-green" onclick="setMatrixStatus('green')"
+                            data-i18n="fb_good">熟練</button>
+                        <button class="btn-grade bg-yellow" onclick="setMatrixStatus('yellow')"
+                            data-i18n="fb_slow">猶豫</button>
+                        <button class="btn-grade bg-red" onclick="setMatrixStatus('red')"
+                            data-i18n="fb_wrong">不熟</button>
+                        <button class="btn-grade bg-gray" onclick="setMatrixStatus('gray')" style="margin-left:8px;"
+                            data-i18n="btn_hide">隱藏</button>
                     </div>
                 </div>
 
-                <div style="margin-top: 16px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                    <div class="control-row">
-                        <button class="action-btn" onclick="resetAllColors()"
-                            style="font-size: 0.85rem; color: #64748b;" data-i18n="btn_reset_color">🔄 重置所有顏色</button>
-                    </div>
-                </div>
+                <!-- Reset button removed -->
             </div>
 
             <div id="grid-area" class="grid-container"></div>
@@ -278,22 +285,47 @@
             <div id="matrix-area" class="matrix-wrapper hidden">
                 <table id="full-matrix" class="matrix-table"></table>
             </div>
+
+            <div id="matrix-footer" class="control-row hidden" style="margin-top: 20px;">
+                <button class="action-btn" onclick="resetAllColors()" style="font-size: 0.85rem; color: #64748b;"
+                    data-i18n="btn_reset_color">🔄 重置所有顏色</button>
+            </div>
         </div>
 
         <div id="view-memory" class="view-section">
             <div class="control-panel">
-                <div class="control-row">
-                    <label data-i18n="lbl_range" style="font-weight:500;">範圍：</label>
-                    <div class="dropdown-wrapper">
-                        <button id="mem-dropdown-btn" onclick="toggleDropdown('mem')" class="action-btn"
+                <div class="control-row" style="gap:10px; flex-wrap:wrap;">
+                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                        <label data-i18n="lbl_start"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">開頭：</label>
+                        <button id="mem_start-btn" onclick="toggleDropdown('mem_start')" class="action-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                        <div class="dropdown-content" id="mem-dropdown-content">
+                        <div class="dropdown-content" id="mem_start-content">
                             <div
                                 style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('mem', true)" style="flex:1;">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('mem', false)" style="flex:1;">全消</button>
+                                <button class="btn-sm" onclick="toggleAll('mem_start', true)" style="flex:1;"
+                                    data-i18n="sel_full">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('mem_start', false)" style="flex:1;"
+                                    data-i18n="sel_none">全消</button>
                             </div>
-                            <div id="mem-range-grid" class="checkbox-grid"></div>
+                            <div id="mem-start-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                        <label data-i18n="lbl_end"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">結尾：</label>
+                        <button id="mem_end-btn" onclick="toggleDropdown('mem_end')" class="action-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <div class="dropdown-content" id="mem_end-content">
+                            <div
+                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                                <button class="btn-sm" onclick="toggleAll('mem_end', true)" style="flex:1;"
+                                    data-i18n="sel_full">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('mem_end', false)" style="flex:1;"
+                                    data-i18n="sel_none">全消</button>
+                            </div>
+                            <div id="mem-end-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
                 </div>
@@ -329,18 +361,38 @@
 
         <div id="view-test" class="view-section">
             <div class="control-panel">
-                <div class="control-row">
-                    <label data-i18n="lbl_test_range" style="font-weight:500;">範圍：</label>
-                    <div class="dropdown-wrapper">
-                        <button id="test-dropdown-btn" onclick="toggleDropdown('test')" class="action-btn"
+                <div class="control-row" style="gap:10px; flex-wrap:wrap;">
+                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                        <label data-i18n="lbl_start"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">開頭：</label>
+                        <button id="test_start-btn" onclick="toggleDropdown('test_start')" class="action-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                        <div class="dropdown-content" id="test-dropdown-content">
+                        <div class="dropdown-content" id="test_start-content">
                             <div
                                 style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('test', true)" style="flex:1;">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('test', false)" style="flex:1;">全消</button>
+                                <button class="btn-sm" onclick="toggleAll('test_start', true)" style="flex:1;"
+                                    data-i18n="sel_full">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('test_start', false)" style="flex:1;"
+                                    data-i18n="sel_none">全消</button>
                             </div>
-                            <div id="test-range-grid" class="checkbox-grid"></div>
+                            <div id="test-start-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                        <label data-i18n="lbl_end"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">結尾：</label>
+                        <button id="test_end-btn" onclick="toggleDropdown('test_end')" class="action-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
+                        <div class="dropdown-content" id="test_end-content">
+                            <div
+                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
+                                <button class="btn-sm" onclick="toggleAll('test_end', true)" style="flex:1;"
+                                    data-i18n="sel_full">全選</button>
+                                <button class="btn-sm" onclick="toggleAll('test_end', false)" style="flex:1;"
+                                    data-i18n="sel_none">全消</button>
+                            </div>
+                            <div id="test-end-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
                 </div>
