@@ -331,6 +331,7 @@ body {
 .icon-link:hover svg { fill: white; transform: scale(1.1); }
 
 /* Mobile */
+/* Mobile */
 @media (max-width: 768px) {
     :root { --header-height: 52px; }
     .nav-container { justify-content: flex-start; padding: 0 12px; }
@@ -348,6 +349,17 @@ body {
     .dropdown-wrapper { max-width: 100%; }
     .checkbox-grid { grid-template-columns: repeat(4, 1fr); }
     #test-input { width: 100%; max-width: none; }
+
+    /* --- 新增修正的部分開始 --- */
+    .import-controls {
+        flex-direction: column; /* 手機版改成上下排列 */
+        align-items: stretch;
+    }
+    .file-input, .btn-import {
+        width: 100%;
+        max-width: 100%;
+    }
+    /* --- 新增修正的部分結束 --- */
 }
 
 .text-success { color: #16a34a !important; }
