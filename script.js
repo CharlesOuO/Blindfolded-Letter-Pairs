@@ -50,7 +50,8 @@ const translations = {
         opt_start: " 開頭", sel_full: "全選", sel_none: "未選擇", sel_count: "已選 {n} 個", sel_prefix: "SEL: ",
         hint_click_flip: "點擊卡片翻牌", fb_empty: "空白跳過", fb_wrong: "不熟", fb_slow: "猶豫", fb_good: "熟練",
         ans_prefix: "答案：", alert_no_data: "請先輸入資料！", alert_sel_range: "請選擇範圍", alert_import_success: "匯入成功", alert_import_error: "格式錯誤",
-        lbl_start: "開頭：", lbl_end: "結尾："
+        lbl_start: "開頭：", lbl_end: "結尾：",
+        btn_hide: "隱藏", lbl_edit_mode: "編輯模式"
     },
     'en': {
         nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Backup",
@@ -65,7 +66,8 @@ const translations = {
         opt_start: " Start", sel_full: "ALL", sel_none: "NONE", sel_count: "{n} selected", sel_prefix: "SEL: ",
         hint_click_flip: "Click to flip", fb_empty: "Skipped", fb_wrong: "Hard", fb_slow: "Slow", fb_good: "Good",
         ans_prefix: "Ans: ", alert_no_data: "No data!", alert_sel_range: "Select range", alert_import_success: "Success", alert_import_error: "Error",
-        lbl_start: "Start:", lbl_end: "End:"
+        lbl_start: "Start:", lbl_end: "End:",
+        btn_hide: "Hide", lbl_edit_mode: "Edit Mode"
     }
 };
 
@@ -399,7 +401,12 @@ window.updateGlobalChar = function (index, newValue) {
     chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
     document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
     initUI(); updateLayoutMode();
-};
+}
+
+window.toggleMatrixEdit = function (editable) {
+    document.querySelectorAll('.matrix-input').forEach(inp => inp.readOnly = !editable);
+    document.querySelectorAll('.header-input').forEach(inp => inp.readOnly = !editable);
+};;
 
 function resetDefaultChars() {
     if (confirm(t('alert_reset'))) {

@@ -454,7 +454,8 @@ body {
 .matrix-table thead th {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 40;
+    /* Increased from 10 to be above .is-selected (20) */
     background: #f1f5f9;
     color: #334155;
     font-weight: bold;
@@ -464,7 +465,8 @@ body {
 .matrix-table tbody th {
     position: sticky;
     left: 0;
-    z-index: 5;
+    z-index: 40;
+    /* Increased from 5 to be above .is-selected (20) */
     background: #f1f5f9;
     font-weight: bold;
     border-right: 2px solid #cbd5e1;
@@ -474,7 +476,8 @@ body {
     position: sticky;
     left: 0;
     top: 0;
-    z-index: 20;
+    z-index: 50;
+    /* Increased from 20 to be above everything */
     background: #e2e8f0;
     border-right: 2px solid #cbd5e1;
     border-bottom: 2px solid #cbd5e1;
@@ -532,6 +535,8 @@ body {
 }
 
 .diagonal-wrapper .matrix-input {
+
+
     height: 60%;
     font-size: 12px;
     display: block;
@@ -796,8 +801,78 @@ body {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    font-weight: 500;
 }
+
+/* Toggle Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked+.slider {
+    background-color: var(--primary-color);
+}
+
+input:focus+.slider {
+    box-shadow: 0 0 1px var(--primary-color);
+}
+
+input:checked+.slider:before {
+    transform: translateX(18px);
+}
+
+/* Rounded sliders */
+.slider.round {
+    border-radius: 34px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* Read-only styling */
+.matrix-input:read-only,
+.header-input:read-only {
+    cursor: default;
+    color: #475569;
+}
+
+.matrix-input:read-only:focus {
+    box-shadow: none;
+    background: transparent;
+}
+
+
 
 /* 匯入區塊 */
 .import-card {

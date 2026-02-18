@@ -263,6 +263,17 @@
                         <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
                         <span id="active-pair-label"
                             style="font-weight:bold; color:var(--primary-color); margin-left:10px;"></span>
+
+                        <!-- Read-only Toggle -->
+                        <div class="toggle-switch-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size:0.9rem; color:#64748b;" data-i18n="lbl_edit_mode">編輯模式</span>
+                            <label class="switch">
+                                <input type="checkbox" id="matrix-edit-toggle" onchange="toggleMatrixEdit(this.checked)"
+                                    checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
                         <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">回復預設</button>
                     </div>
                     <div class="control-row" style="gap: 8px;">
