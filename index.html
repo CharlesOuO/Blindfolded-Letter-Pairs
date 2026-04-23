@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Letter Pairs Practice (SM-2)</title>
+    <title data-i18n="page_title">Letter Pairs Practice (SM-2)</title>
     <link rel="stylesheet" href="style.css">
 
     <style>
@@ -247,7 +247,7 @@
                         style="border-color:var(--primary-color); color:var(--primary-color);">📋 <span
                             data-i18n="mode_card">列表模式</span></button>
                     <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')">▦ <span
-                            data-i18n="mode_matrix">全表模式</span></button>
+                            data-i18n="mode_matrix">表格模式</span></button>
                 </div>
 
                 <div id="list-mode-controls">
@@ -414,7 +414,7 @@
                     0.0s</div>
                 <div class="question" id="test-q">?</div>
 
-                <textarea id="test-input" placeholder="Type here"></textarea>
+                <textarea id="test-input" data-i18n-placeholder="ph_input" placeholder="Type here"></textarea>
 
                 <div id="test-feedback" style="margin-top:20px; font-weight:bold; min-height:28px; font-size:1.1rem;">
                 </div>
@@ -490,7 +490,7 @@
                 </svg></a>
         </div>
         <div style="margin-bottom:8px;">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
-        <button onclick="toggleLanguage()"
+        <button id="lang-toggle-btn" onclick="toggleLanguage()" data-i18n="btn_toggle_lang"
             style="background:transparent; border:1px solid #64748b; color:#94a3b8; border-radius:20px; padding:4px 12px; cursor:pointer; font-size:0.8rem; transition:0.2s;">English
             / 中文</button>
     </footer>

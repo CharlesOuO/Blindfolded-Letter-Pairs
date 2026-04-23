@@ -202,7 +202,7 @@ body {
 }
 
 .container.wide-mode .control-panel {
-    max-width: 100%;
+    max-width: min(820px, 100%);
 }
 
 .control-row {
@@ -216,6 +216,83 @@ body {
 .control-row label {
     white-space: nowrap;
     margin: 0;
+}
+
+.matrix-footer {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 4px;
+}
+
+.matrix-footer-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-sub);
+}
+
+.matrix-footer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.mode-hint {
+    margin-top: 12px;
+    color: var(--text-sub);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    text-align: left;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.list-mode-switcher {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.list-mode-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.list-mode-group-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    text-align: left;
+    padding-left: 4px;
+}
+
+.list-mode-group-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.mode-choice-btn {
+    margin: 0;
+    min-width: 0;
+    padding: 10px 14px;
+    font-weight: 700;
+    border-radius: 12px;
+    justify-content: center;
+    box-shadow: none;
 }
 
 .card-area,
@@ -422,6 +499,11 @@ body {
     margin: 0 auto;
 }
 
+.matrix-wrapper.formula-matrix-mode {
+    --cell-width: 160px;
+    --cell-height: 110px;
+}
+
 .matrix-table {
     border-collapse: separate;
     border-spacing: 0;
@@ -449,6 +531,15 @@ body {
 
 .matrix-table td {
     position: relative;
+}
+
+.matrix-wrapper.formula-matrix-mode .matrix-table td {
+    white-space: normal;
+}
+
+.matrix-wrapper.formula-matrix-mode .matrix-table thead th,
+.matrix-wrapper.formula-matrix-mode .matrix-table tbody th {
+    height: 48px;
 }
 
 .matrix-table thead th {
@@ -501,6 +592,16 @@ body {
     font-family: inherit;
 }
 
+.matrix-wrapper.formula-matrix-mode .matrix-input {
+    text-align: left;
+    padding: 8px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    resize: none;
+    display: block;
+}
+
 .matrix-input:focus {
     background: rgba(255, 255, 255, 0.9);
     box-shadow: inset 0 0 0 2px var(--primary-color);
@@ -525,6 +626,10 @@ body {
     line-height: var(--cell-height);
 }
 
+.matrix-wrapper.formula-matrix-mode .header-input {
+    line-height: 48px;
+}
+
 .diagonal-wrapper {
     display: flex;
     flex-direction: column;
@@ -541,6 +646,17 @@ body {
     font-size: 12px;
     display: block;
     line-height: 22px;
+}
+
+.matrix-wrapper.formula-matrix-mode .diagonal-wrapper .matrix-input {
+    flex: 1 1 auto;
+    height: calc(100% - 28px);
+    line-height: 1.35;
+}
+
+.matrix-wrapper.formula-matrix-mode .btn-diagonal-check {
+    height: 28px;
+    flex: 0 0 28px;
 }
 
 .btn-diagonal-check {
@@ -613,6 +729,12 @@ body {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
+.pair-item-formula {
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 170px;
+}
+
 .pair-label {
     font-size: 0.9rem;
     color: var(--text-sub);
@@ -634,6 +756,20 @@ body {
     border-color: var(--primary-color);
     outline: none;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.formula-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    align-items: stretch;
+}
+
+.formula-input {
+    min-height: 96px;
+    resize: vertical;
+    text-align: left;
+    line-height: 1.45;
+    padding: 10px;
+    font-family: inherit;
 }
 
 /* Other UI */
@@ -1044,6 +1180,18 @@ input:checked+.slider:before {
         max-width: 100%;
     }
 
+    .list-mode-switcher {
+        grid-template-columns: 1fr;
+    }
+
+    .list-mode-group-label {
+        text-align: left;
+    }
+
+    .list-mode-group-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .card-area,
     .card-area-test {
         padding: 25px 15px;
@@ -1066,6 +1214,19 @@ input:checked+.slider:before {
     .grid-container {
         grid-template-columns: repeat(3, 1fr);
         gap: 8px;
+    }
+
+    .formula-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pair-item-formula {
+        min-height: auto;
+    }
+
+    .matrix-wrapper.formula-matrix-mode {
+        --cell-width: 132px;
+        --cell-height: 96px;
     }
 
     .btn-primary {
