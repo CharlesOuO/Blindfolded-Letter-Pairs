@@ -3,9 +3,13 @@ const CHARS_EN = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm
 let chars = [...CHARS_ZH];
 
 const STORAGE_KEY = 'bld_custom_dict_v3';
-const FORMULA_STORAGE_KEY = 'bld_formula_dict_v1';
 const STATUS_KEY = 'bld_status_v1';
-const FORMULA_STATUS_KEY = 'bld_formula_status_v1';
+const LEGACY_FORMULA_STORAGE_KEY = 'bld_formula_dict_v1';
+const LEGACY_FORMULA_STATUS_KEY = 'bld_formula_status_v1';
+const CORNER_FORMULA_STORAGE_KEY = 'bld_formula_corner_dict_v1';
+const EDGE_FORMULA_STORAGE_KEY = 'bld_formula_edge_dict_v1';
+const CORNER_FORMULA_STATUS_KEY = 'bld_formula_corner_status_v1';
+const EDGE_FORMULA_STATUS_KEY = 'bld_formula_edge_status_v1';
 const LANG_KEY = 'bld_lang_v1';
 const CHARS_KEY = 'bld_chars_v1';
 
@@ -19,6 +23,7 @@ let lastTestPair = null;
 let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
 let isMatrixMode = false;
 let currentListViewMode = 'list';
+let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
 
 // --- [新增] 矩陣模式目前選中的配對 ---
@@ -86,13 +91,22 @@ Object.assign(translations['zh-TW'], {
     switch_matrix: "\u8868\u683c",
     switch_words: "\u5b57\u8a5e",
     switch_algorithm: "\u516c\u5f0f",
+    algorithm_type: "\u516c\u5f0f\u985e\u578b",
+    algorithm_corners: "Corners",
+    algorithm_edges: "Edges",
     content_word_label: "\u5b57\u8a5e",
     content_formula_label: "\u516c\u5f0f",
+    content_corner_label: "Corners",
+    content_edge_label: "Edges",
     study_word_mode: "\u5b57\u8a5e\u6a21\u5f0f",
     study_formula_mode: "\u516c\u5f0f\u6a21\u5f0f",
+    study_corner_mode: "Corners",
+    study_edge_mode: "Edges",
     ph_formula: "\u8f38\u5165\u516c\u5f0f",
-    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44 letter pair \u8f38\u5165\u516c\u5f0f\uff0cFlashcards \u53ef\u5207\u63db\u6210\u516c\u5f0f\u6a21\u5f0f\u7df4\u7fd2",
+    ph_algorithm: "\u8f38\u5165\u516c\u5f0f",
+    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44 letter pair \u8f38\u5165 corners \u6216 edges \u516c\u5f0f\uff0cFlashcards \u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
     alert_no_formula_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u516c\u5f0f\u8cc7\u6599\uff01",
+    alert_no_algorithm_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709 corners \u6216 edges \u516c\u5f0f\u8cc7\u6599\uff01",
     alert_select_matrix_cells: "\u8acb\u5148\u9ede\u9078\u77e9\u9663\u4e2d\u7684\u683c\u5b50\uff01",
     msg_matrix_updated: "\u5df2\u66f4\u65b0\uff01",
     confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210 English a-x \u4ee3\u78bc\u55ce\uff1f",
@@ -113,13 +127,22 @@ Object.assign(translations.en, {
     switch_matrix: "Table",
     switch_words: "Words",
     switch_algorithm: "Algorithm",
+    algorithm_type: "Algorithm Type",
+    algorithm_corners: "Corners",
+    algorithm_edges: "Edges",
     content_word_label: "Word",
     content_formula_label: "Formula",
+    content_corner_label: "Corners",
+    content_edge_label: "Edges",
     study_word_mode: "Word Mode",
     study_formula_mode: "Formula Mode",
+    study_corner_mode: "Corners",
+    study_edge_mode: "Edges",
     ph_formula: "Enter formula",
-    hint_formula_edit: "Edit algorithms or formulas for the selected start code. Flashcards can switch to Formula Mode.",
+    ph_algorithm: "Enter algorithm",
+    hint_formula_edit: "Edit corner or edge algorithms for the selected start code. Flashcards can study them separately too.",
     alert_no_formula_data: "No formula data in this range!",
+    alert_no_algorithm_data: "No corner or edge algorithm data in this range!",
     alert_select_matrix_cells: "Please select matrix cells first!",
     msg_matrix_updated: "Updated!",
     confirm_switch_chars_en: "Also switch to English a-x codes?",
@@ -129,6 +152,22 @@ Object.assign(translations.en, {
 });
 
 const SM2_SETTINGS = { defaultEf: 2.5, minEf: 1.3, intervals: [1, 3] };
+
+function isAlgorithmContentMode(contentMode = 'word') {
+    return contentMode === 'corner' || contentMode === 'edge';
+}
+
+function getContentStorageKey(contentMode = 'word') {
+    if (contentMode === 'corner') return CORNER_FORMULA_STORAGE_KEY;
+    if (contentMode === 'edge') return EDGE_FORMULA_STORAGE_KEY;
+    return STORAGE_KEY;
+}
+
+function getStatusStorageKey(contentMode = 'word') {
+    if (contentMode === 'corner') return CORNER_FORMULA_STATUS_KEY;
+    if (contentMode === 'edge') return EDGE_FORMULA_STATUS_KEY;
+    return STATUS_KEY;
+}
 
 function calculateNextReview(currentData, grade) {
     let card = (typeof currentData === 'object' && currentData !== null) ? currentData : {
@@ -151,8 +190,7 @@ function calculateNextReview(currentData, grade) {
 }
 
 function getStatusMap(contentMode = 'word') {
-    const statusKey = contentMode === 'formula' ? FORMULA_STATUS_KEY : STATUS_KEY;
-    return JSON.parse(localStorage.getItem(statusKey)) || {};
+    return JSON.parse(localStorage.getItem(getStatusStorageKey(contentMode))) || {};
 }
 function getPairData(pair, contentMode = 'word') {
     const map = getStatusMap(contentMode);
@@ -164,23 +202,37 @@ function getPairData(pair, contentMode = 'word') {
 }
 function saveStatusData(pair, dataObject, contentMode = 'word') {
     const map = getStatusMap(contentMode);
-    const statusKey = contentMode === 'formula' ? FORMULA_STATUS_KEY : STATUS_KEY;
     map[pair] = dataObject;
-    localStorage.setItem(statusKey, JSON.stringify(map));
+    localStorage.setItem(getStatusStorageKey(contentMode), JSON.stringify(map));
 }
 function getPairColor(pair, contentMode = 'word') { const data = getPairData(pair, contentMode); return data ? (data.color || 'red') : ''; }
 
 function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
 function getDict() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
 function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
-function getFormulaDict() { return JSON.parse(localStorage.getItem(FORMULA_STORAGE_KEY)) || {}; }
-function saveFormulaDict(d) { localStorage.setItem(FORMULA_STORAGE_KEY, JSON.stringify(d)); }
-function getContentDict(contentMode = 'word') { return contentMode === 'formula' ? getFormulaDict() : getDict(); }
-function saveContentDict(contentMode = 'word', dict) { return contentMode === 'formula' ? saveFormulaDict(dict) : saveDict(dict); }
+function getFormulaDict(formulaType = 'corner') { return JSON.parse(localStorage.getItem(getContentStorageKey(formulaType))) || {}; }
+function saveFormulaDict(formulaType = 'corner', dict) { localStorage.setItem(getContentStorageKey(formulaType), JSON.stringify(dict)); }
+function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : getDict(); }
+function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : saveDict(dict); }
+
+function migrateLegacyFormulaData() {
+    const hasCornerFormula = !!localStorage.getItem(CORNER_FORMULA_STORAGE_KEY);
+    const hasCornerStatus = !!localStorage.getItem(CORNER_FORMULA_STATUS_KEY);
+    const legacyFormula = JSON.parse(localStorage.getItem(LEGACY_FORMULA_STORAGE_KEY)) || {};
+    const legacyStatus = JSON.parse(localStorage.getItem(LEGACY_FORMULA_STATUS_KEY)) || {};
+
+    if (!hasCornerFormula && Object.keys(legacyFormula).length > 0) {
+        localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(legacyFormula));
+    }
+    if (!hasCornerStatus && Object.keys(legacyStatus).length > 0) {
+        localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(legacyStatus));
+    }
+}
 
 function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
+    migrateLegacyFormulaData();
     initUI(); setupDynamicUI(); applyLanguage(); updateLayoutMode();
     setupEventListeners();
     updateMemoryContentModeButtons();
@@ -220,7 +272,7 @@ function setupEventListeners() {
     formulaContainer.addEventListener('input', (e) => {
         if (e.target.matches('.formula-input')) {
             const pair = e.target.dataset.pair;
-            savePairDataDebounced(pair, e.target.value, 'formula');
+            savePairDataDebounced(pair, e.target.value, e.target.dataset.store || getCurrentListContentMode());
         }
     });
 
@@ -293,6 +345,8 @@ function setupDynamicUI() {
     const matrixButton = document.getElementById('btn-mode-matrix');
     let wordButton = document.getElementById('btn-mode-content-word');
     let algorithmButton = document.getElementById('btn-mode-content-formula');
+    let cornerAlgorithmButton = document.getElementById('btn-algorithm-type-corner');
+    let edgeAlgorithmButton = document.getElementById('btn-algorithm-type-edge');
 
     if (!wordButton) {
         wordButton = document.createElement('button');
@@ -303,6 +357,16 @@ function setupDynamicUI() {
         algorithmButton = document.createElement('button');
         algorithmButton.id = 'btn-mode-content-formula';
         algorithmButton.className = 'action-btn';
+    }
+    if (!cornerAlgorithmButton) {
+        cornerAlgorithmButton = document.createElement('button');
+        cornerAlgorithmButton.id = 'btn-algorithm-type-corner';
+        cornerAlgorithmButton.className = 'action-btn';
+    }
+    if (!edgeAlgorithmButton) {
+        edgeAlgorithmButton = document.createElement('button');
+        edgeAlgorithmButton.id = 'btn-algorithm-type-edge';
+        edgeAlgorithmButton.className = 'action-btn';
     }
 
     if (listButton) {
@@ -320,12 +384,28 @@ function setupDynamicUI() {
     algorithmButton.onclick = () => setListContentMode('formula');
     algorithmButton.innerHTML = `<span data-i18n="switch_algorithm">${t('switch_algorithm')}</span>`;
 
+    cornerAlgorithmButton.onclick = () => setAlgorithmType('corner');
+    cornerAlgorithmButton.innerHTML = `<span data-i18n="algorithm_corners">${t('algorithm_corners')}</span>`;
+
+    edgeAlgorithmButton.onclick = () => setAlgorithmType('edge');
+    edgeAlgorithmButton.innerHTML = `<span data-i18n="algorithm_edges">${t('algorithm_edges')}</span>`;
+
     if (modeRow) {
         modeRow.className = 'list-mode-switcher';
         modeRow.style.marginBottom = '16px';
         modeRow.innerHTML = '';
         modeRow.appendChild(createListModeGroup('switch_layout', [listButton, matrixButton], 'list-mode-group-layout'));
         modeRow.appendChild(createListModeGroup('switch_content', [wordButton, algorithmButton], 'list-mode-group-content'));
+
+        let algorithmTypeSwitcher = document.getElementById('algorithm-type-switcher');
+        if (!algorithmTypeSwitcher) {
+            algorithmTypeSwitcher = document.createElement('div');
+            algorithmTypeSwitcher.id = 'algorithm-type-switcher';
+            algorithmTypeSwitcher.className = 'algorithm-type-switcher hidden';
+            modeRow.insertAdjacentElement('afterend', algorithmTypeSwitcher);
+        }
+        algorithmTypeSwitcher.innerHTML = '';
+        algorithmTypeSwitcher.appendChild(createListModeGroup('algorithm_type', [cornerAlgorithmButton, edgeAlgorithmButton], 'algorithm-type-group'));
     }
 
     const listControls = document.getElementById('list-mode-controls');
@@ -366,6 +446,7 @@ function setupDynamicUI() {
         const modeRow = document.createElement('div');
         modeRow.className = 'control-row';
         modeRow.style.gap = '10px';
+        modeRow.style.flexWrap = 'wrap';
         modeRow.style.marginBottom = '16px';
 
         const wordButton = document.createElement('button');
@@ -375,15 +456,23 @@ function setupDynamicUI() {
         wordButton.setAttribute('data-i18n', 'study_word_mode');
         wordButton.innerText = t('study_word_mode');
 
-        const formulaButton = document.createElement('button');
-        formulaButton.id = 'btn-mem-content-formula';
-        formulaButton.className = 'action-btn';
-        formulaButton.onclick = () => toggleMemoryContentMode('formula');
-        formulaButton.setAttribute('data-i18n', 'study_formula_mode');
-        formulaButton.innerText = t('study_formula_mode');
+        const cornerButton = document.createElement('button');
+        cornerButton.id = 'btn-mem-content-corner';
+        cornerButton.className = 'action-btn';
+        cornerButton.onclick = () => toggleMemoryContentMode('corner');
+        cornerButton.setAttribute('data-i18n', 'study_corner_mode');
+        cornerButton.innerText = t('study_corner_mode');
+
+        const edgeButton = document.createElement('button');
+        edgeButton.id = 'btn-mem-content-edge';
+        edgeButton.className = 'action-btn';
+        edgeButton.onclick = () => toggleMemoryContentMode('edge');
+        edgeButton.setAttribute('data-i18n', 'study_edge_mode');
+        edgeButton.innerText = t('study_edge_mode');
 
         modeRow.appendChild(wordButton);
-        modeRow.appendChild(formulaButton);
+        modeRow.appendChild(cornerButton);
+        modeRow.appendChild(edgeButton);
         memoryPanel.insertBefore(modeRow, memoryPanel.firstElementChild);
     }
 }
@@ -432,7 +521,13 @@ function isMemoryContentModeActive(mode) {
 }
 
 function getContentLabelKey(mode) {
-    return mode === 'formula' ? 'content_formula_label' : 'content_word_label';
+    if (mode === 'corner') return 'content_corner_label';
+    if (mode === 'edge') return 'content_edge_label';
+    return 'content_word_label';
+}
+
+function getNoDataErrorKey(contentModes = ['word']) {
+    return normalizeContentModes(contentModes).every(isAlgorithmContentMode) ? 'alert_no_algorithm_data' : 'alert_no_data';
 }
 
 function getPairContentValue(pair, contentMode) {
@@ -472,38 +567,53 @@ function isFormulaListView(mode = currentListViewMode) {
     return mode === 'formula' || mode === 'formula-matrix';
 }
 
-function getCurrentListContentMode(mode = currentListViewMode) {
+function getCurrentListContentGroup(mode = currentListViewMode) {
     return isFormulaListView(mode) ? 'formula' : 'word';
+}
+
+function getCurrentListContentMode(mode = currentListViewMode) {
+    return isFormulaListView(mode) ? currentAlgorithmType : 'word';
 }
 
 function getCurrentListLayoutMode(mode = currentListViewMode) {
     return isMatrixListView(mode) ? 'matrix' : 'list';
 }
 
-function buildListViewMode(layout = 'list', contentMode = 'word') {
-    if (contentMode === 'formula') {
+function buildListViewMode(layout = 'list', contentGroup = 'word') {
+    if (contentGroup === 'formula') {
         return layout === 'matrix' ? 'formula-matrix' : 'formula';
     }
     return layout === 'matrix' ? 'matrix' : 'list';
 }
 
 function setListLayoutMode(layout) {
-    toggleViewMode(buildListViewMode(layout, getCurrentListContentMode()));
+    toggleViewMode(buildListViewMode(layout, getCurrentListContentGroup()));
 }
 
-function setListContentMode(contentMode) {
-    toggleViewMode(buildListViewMode(getCurrentListLayoutMode(), contentMode));
+function setListContentMode(contentGroup) {
+    toggleViewMode(buildListViewMode(getCurrentListLayoutMode(), contentGroup));
+}
+
+function setAlgorithmType(type) {
+    currentAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    toggleViewMode(currentListViewMode);
 }
 
 function renderCurrentListView() {
     if (isMatrixListView()) renderMatrix(getCurrentListContentMode());
-    else if (getCurrentListContentMode() === 'formula') renderFormulaList();
+    else if (getCurrentListContentGroup() === 'formula') renderFormulaList();
     else renderList();
 }
 
 function updateMemoryContentModeButtons() {
     setActionButtonActive(document.getElementById('btn-mem-content-word'), isMemoryContentModeActive('word'));
-    setActionButtonActive(document.getElementById('btn-mem-content-formula'), isMemoryContentModeActive('formula'));
+    setActionButtonActive(document.getElementById('btn-mem-content-corner'), isMemoryContentModeActive('corner'));
+    setActionButtonActive(document.getElementById('btn-mem-content-edge'), isMemoryContentModeActive('edge'));
+}
+
+function updateAlgorithmTypeButtons() {
+    setActionButtonActive(document.getElementById('btn-algorithm-type-corner'), currentAlgorithmType === 'corner');
+    setActionButtonActive(document.getElementById('btn-algorithm-type-edge'), currentAlgorithmType === 'edge');
 }
 
 function toggleMemoryContentMode(mode) {
@@ -525,6 +635,7 @@ function toggleViewMode(mode) {
     const matrixBtn = document.getElementById('btn-mode-matrix');
     const wordBtn = document.getElementById('btn-mode-content-word');
     const formulaBtn = document.getElementById('btn-mode-content-formula');
+    const algorithmTypeSwitcher = document.getElementById('algorithm-type-switcher');
     const listControls = document.getElementById('list-mode-controls');
     const formulaHint = document.getElementById('formula-mode-hint');
     const matrixSettings = document.getElementById('matrix-settings');
@@ -534,12 +645,18 @@ function toggleViewMode(mode) {
     const matrixFooter = document.getElementById('matrix-footer');
     const container = document.getElementById('main-container');
     const currentLayout = getCurrentListLayoutMode(mode);
+    const currentContentGroup = getCurrentListContentGroup(mode);
     const currentContent = getCurrentListContentMode(mode);
 
     setActionButtonActive(listBtn, currentLayout === 'list');
     setActionButtonActive(matrixBtn, currentLayout === 'matrix');
-    setActionButtonActive(wordBtn, currentContent === 'word');
-    setActionButtonActive(formulaBtn, currentContent === 'formula');
+    setActionButtonActive(wordBtn, currentContentGroup === 'word');
+    setActionButtonActive(formulaBtn, currentContentGroup === 'formula');
+    updateAlgorithmTypeButtons();
+
+    if (algorithmTypeSwitcher) {
+        algorithmTypeSwitcher.classList.toggle('hidden', currentContentGroup !== 'formula');
+    }
 
     if (isMatrixListView(mode)) {
         container.classList.add('wide-mode');
@@ -551,7 +668,7 @@ function toggleViewMode(mode) {
         matrixArea.classList.remove('hidden');
         if (matrixFooter) matrixFooter.classList.remove('hidden');
         renderMatrix(currentContent);
-    } else if (currentContent === 'formula') {
+    } else if (currentContentGroup === 'formula') {
         container.classList.remove('wide-mode');
         listControls.classList.remove('hidden');
         formulaHint.classList.remove('hidden');
@@ -604,7 +721,8 @@ function renderList() {
 function renderFormulaList() {
     const startChar = document.getElementById('char-select').value;
     const container = document.getElementById('formula-area');
-    const formulaDict = getFormulaDict();
+    const contentMode = getCurrentListContentMode();
+    const formulaDict = getContentDict(contentMode);
     container.innerHTML = '';
     const fragment = document.createDocumentFragment();
 
@@ -618,11 +736,11 @@ function renderFormulaList() {
         const textarea = document.createElement('textarea');
         textarea.className = 'pair-input formula-input';
         textarea.dataset.pair = pair;
-        textarea.dataset.store = 'formula';
+        textarea.dataset.store = contentMode;
         textarea.rows = 3;
-        textarea.placeholder = t('ph_formula');
+        textarea.placeholder = t('ph_algorithm');
 
-        const stColor = getPairColor(pair, 'formula');
+        const stColor = getPairColor(pair, contentMode);
         if (stColor) textarea.classList.add(`status-${stColor}`);
         textarea.value = formulaDict[pair] || "";
 
@@ -637,7 +755,7 @@ function renderMatrix(contentMode = 'word') {
     const table = document.getElementById('full-matrix');
     const matrixWrapper = document.getElementById('matrix-area');
     const dict = getContentDict(contentMode);
-    if (matrixWrapper) matrixWrapper.classList.toggle('formula-matrix-mode', contentMode === 'formula');
+    if (matrixWrapper) matrixWrapper.classList.toggle('formula-matrix-mode', isAlgorithmContentMode(contentMode));
 
     // [修改] 渲染時清空選取
     selectedMatrixPairs.clear();
@@ -659,7 +777,7 @@ function renderMatrix(contentMode = 'word') {
             const stColor = getPairColor(pair, contentMode);
             let cellClass = stColor ? `status-${stColor}` : '';
             const val = dict[pair] || '';
-            const inputMarkup = contentMode === 'formula'
+            const inputMarkup = isAlgorithmContentMode(contentMode)
                 ? `<textarea class="matrix-input" data-pair="${pair}" data-store="${contentMode}" rows="3">${val}</textarea>`
                 : `<input class="matrix-input" value="${val}" data-pair="${pair}" data-store="${contentMode}">`;
 
@@ -879,7 +997,7 @@ function switchTab(tab) {
 function resetAllColors(targetColor = 'all') {
     if (confirm(t('alert_reset'))) {
         const contentMode = getCurrentListContentMode();
-        const statusKey = contentMode === 'formula' ? FORMULA_STATUS_KEY : STATUS_KEY;
+        const statusKey = getStatusStorageKey(contentMode);
 
         if (targetColor === 'all') {
             localStorage.setItem(statusKey, JSON.stringify({}));
@@ -959,7 +1077,7 @@ function getCandidatePool(mode, contentModes = ['word']) {
 
     // 檢查是否有任何有效資料
     if (groupNew.length === 0 && groupRed.length === 0 && groupYellow.length === 0 && groupGreen.length === 0) {
-        return { error: contentMode === 'formula' ? 'alert_no_formula_data' : 'alert_no_data' };
+        return { error: getNoDataErrorKey(normalizedModes) };
     }
 
     // 優先順序：沒測驗過 (New) > 不熟悉 (Red) > 猶豫 (Yellow) > 精熟 (Green)
@@ -1005,7 +1123,7 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
     });
 
     if (groupNew.length === 0 && groupRed.length === 0 && groupYellow.length === 0 && groupGreen.length === 0) {
-        return { error: normalizedModes.length === 1 && normalizedModes[0] === 'formula' ? 'alert_no_formula_data' : 'alert_no_data' };
+        return { error: getNoDataErrorKey(normalizedModes) };
     }
 
     if (groupNew.length > 0) return { pool: groupNew };
@@ -1124,7 +1242,8 @@ function checkTestAnswer() {
 function exportData() {
     const exportType = document.getElementById('export-type').value;
     const dict = getDict();
-    const formulaDict = getFormulaDict();
+    const cornerFormulaDict = getFormulaDict('corner');
+    const edgeFormulaDict = getFormulaDict('edge');
 
     if (exportType === 'csv') {
         let csvContent = "\ufeff";
@@ -1155,11 +1274,14 @@ function exportData() {
 
     } else {
         const statusMap = getStatusMap();
-        const formulaStatusMap = getStatusMap('formula');
+        const cornerFormulaStatusMap = getStatusMap('corner');
+        const edgeFormulaStatusMap = getStatusMap('edge');
         const cleanDict = {};
-        const cleanFormulaDict = {};
+        const cleanCornerFormulaDict = {};
+        const cleanEdgeFormulaDict = {};
         const cleanStatus = {};
-        const cleanFormulaStatus = {};
+        const cleanCornerFormulaStatus = {};
+        const cleanEdgeFormulaStatus = {};
 
         chars.forEach(start => {
             chars.forEach(end => {
@@ -1168,18 +1290,26 @@ function exportData() {
                     cleanDict[pair] = dict[pair];
                     if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
                 }
-                if (formulaDict[pair]) {
-                    cleanFormulaDict[pair] = formulaDict[pair];
-                    if (formulaStatusMap[pair]) cleanFormulaStatus[pair] = formulaStatusMap[pair];
+                if (cornerFormulaDict[pair]) {
+                    cleanCornerFormulaDict[pair] = cornerFormulaDict[pair];
+                    if (cornerFormulaStatusMap[pair]) cleanCornerFormulaStatus[pair] = cornerFormulaStatusMap[pair];
+                }
+                if (edgeFormulaDict[pair]) {
+                    cleanEdgeFormulaDict[pair] = edgeFormulaDict[pair];
+                    if (edgeFormulaStatusMap[pair]) cleanEdgeFormulaStatus[pair] = edgeFormulaStatusMap[pair];
                 }
             });
         });
 
         const blob = new Blob([JSON.stringify({
             dict: cleanDict,
-            formulaDict: cleanFormulaDict,
+            formulaDict: cleanCornerFormulaDict,
+            cornerFormulaDict: cleanCornerFormulaDict,
+            edgeFormulaDict: cleanEdgeFormulaDict,
             status: cleanStatus,
-            formulaStatus: cleanFormulaStatus,
+            formulaStatus: cleanCornerFormulaStatus,
+            cornerFormulaStatus: cleanCornerFormulaStatus,
+            edgeFormulaStatus: cleanEdgeFormulaStatus,
             chars: chars
         })], { type: "application/json" });
 
@@ -1196,10 +1326,16 @@ function importData() {
     if (!f) return; const r = new FileReader(); r.onload = (e) => {
         try {
             const d = JSON.parse(e.target.result);
+            const importedCornerFormulaDict = d.cornerFormulaDict || d.formulaDict || {};
+            const importedEdgeFormulaDict = d.edgeFormulaDict || {};
+            const importedCornerFormulaStatus = d.cornerFormulaStatus || d.formulaStatus || {};
+            const importedEdgeFormulaStatus = d.edgeFormulaStatus || {};
             localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict || {}));
-            localStorage.setItem(FORMULA_STORAGE_KEY, JSON.stringify(d.formulaDict || {}));
+            localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(importedCornerFormulaDict));
+            localStorage.setItem(EDGE_FORMULA_STORAGE_KEY, JSON.stringify(importedEdgeFormulaDict));
             localStorage.setItem(STATUS_KEY, JSON.stringify(d.status || {}));
-            localStorage.setItem(FORMULA_STATUS_KEY, JSON.stringify(d.formulaStatus || {}));
+            localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(importedCornerFormulaStatus));
+            localStorage.setItem(EDGE_FORMULA_STATUS_KEY, JSON.stringify(importedEdgeFormulaStatus));
             if (d.chars) { chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); }
             alert(t('alert_import_success')); initUI(); updateLayoutMode();
             renderCurrentListView();
