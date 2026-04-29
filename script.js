@@ -25,6 +25,7 @@ let isMatrixMode = false;
 let currentListViewMode = 'list';
 let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
+const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -104,7 +105,7 @@ Object.assign(translations['zh-TW'], {
     study_edge_mode: "Edges",
     ph_formula: "\u8f38\u5165\u516c\u5f0f",
     ph_algorithm: "\u8f38\u5165\u516c\u5f0f",
-    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44 letter pair \u8f38\u5165 corners \u6216 edges \u516c\u5f0f\uff0cFlashcards \u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
+    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44 letter pair \u8f38\u5165 corners \u6216 edges \u516c\u5f0f\uff0c\u7a7a\u767d\u6642\u6703\u986f\u793a\u5167\u5efa BLDDB \u9810\u8a2d commutator\uff0cFlashcards \u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
     alert_no_formula_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u516c\u5f0f\u8cc7\u6599\uff01",
     alert_no_algorithm_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709 corners \u6216 edges \u516c\u5f0f\u8cc7\u6599\uff01",
     alert_select_matrix_cells: "\u8acb\u5148\u9ede\u9078\u77e9\u9663\u4e2d\u7684\u683c\u5b50\uff01",
@@ -140,7 +141,7 @@ Object.assign(translations.en, {
     study_edge_mode: "Edges",
     ph_formula: "Enter formula",
     ph_algorithm: "Enter algorithm",
-    hint_formula_edit: "Edit corner or edge algorithms for the selected start code. Flashcards can study them separately too.",
+    hint_formula_edit: "Edit corner or edge algorithms for the selected start code. Empty fields show built-in BLDDB commutators, and Flashcards can study them separately too.",
     alert_no_formula_data: "No formula data in this range!",
     alert_no_algorithm_data: "No corner or edge algorithm data in this range!",
     alert_select_matrix_cells: "Please select matrix cells first!",
@@ -526,13 +527,50 @@ function getContentLabelKey(mode) {
     return 'content_word_label';
 }
 
+function getBuiltInAlgorithmMap(contentMode = 'corner') {
+    return isAlgorithmContentMode(contentMode) ? (BUILT_IN_ALGORITHMS[contentMode] || {}) : {};
+}
+
+function getPairIndices(pair) {
+    for (let startIndex = 0; startIndex < chars.length; startIndex++) {
+        const startLabel = chars[startIndex];
+        if (!pair.startsWith(startLabel)) continue;
+
+        const endLabel = pair.slice(startLabel.length);
+        const endIndex = chars.indexOf(endLabel);
+        if (endIndex !== -1) return [startIndex, endIndex];
+    }
+
+    return [-1, -1];
+}
+
+function getBuiltInAlgorithm(pair, contentMode = 'corner') {
+    if (!isAlgorithmContentMode(contentMode)) return '';
+
+    const [startIndex, endIndex] = getPairIndices(pair);
+    if (startIndex === -1 || endIndex === -1) return '';
+
+    return getBuiltInAlgorithmMap(contentMode)[`${startIndex}-${endIndex}`] || '';
+}
+
+function getAlgorithmPlaceholder(pair, contentMode = 'corner') {
+    return getBuiltInAlgorithm(pair, contentMode) || t('ph_algorithm');
+}
+
 function getNoDataErrorKey(contentModes = ['word']) {
     return normalizeContentModes(contentModes).every(isAlgorithmContentMode) ? 'alert_no_algorithm_data' : 'alert_no_data';
 }
 
-function getPairContentValue(pair, contentMode) {
+function getPairContentValue(pair, contentMode, options = {}) {
     const dict = getContentDict(contentMode);
-    return (dict[pair] || '').trim();
+    const storedValue = (dict[pair] || '').trim();
+    if (storedValue) return storedValue;
+
+    if (options.includeBuiltIn !== false && isAlgorithmContentMode(contentMode)) {
+        return getBuiltInAlgorithm(pair, contentMode);
+    }
+
+    return '';
 }
 
 function getAvailablePairContentModes(pair, contentModes = ['word']) {
@@ -738,7 +776,7 @@ function renderFormulaList() {
         textarea.dataset.pair = pair;
         textarea.dataset.store = contentMode;
         textarea.rows = 3;
-        textarea.placeholder = t('ph_algorithm');
+        textarea.placeholder = getAlgorithmPlaceholder(pair, contentMode);
 
         const stColor = getPairColor(pair, contentMode);
         if (stColor) textarea.classList.add(`status-${stColor}`);
@@ -762,6 +800,15 @@ function renderMatrix(contentMode = 'word') {
     updateMatrixToolbar();
 
     const rows = [];
+    const escapeHtmlAttribute = (value = '') => value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const escapeHtmlText = (value = '') => value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
     let headerHtml = '<thead><tr><th></th>';
     chars.forEach((c, index) => {
@@ -777,9 +824,10 @@ function renderMatrix(contentMode = 'word') {
             const stColor = getPairColor(pair, contentMode);
             let cellClass = stColor ? `status-${stColor}` : '';
             const val = dict[pair] || '';
+            const placeholder = isAlgorithmContentMode(contentMode) ? getAlgorithmPlaceholder(pair, contentMode) : '';
             const inputMarkup = isAlgorithmContentMode(contentMode)
-                ? `<textarea class="matrix-input" data-pair="${pair}" data-store="${contentMode}" rows="3">${val}</textarea>`
-                : `<input class="matrix-input" value="${val}" data-pair="${pair}" data-store="${contentMode}">`;
+                ? `<textarea class="matrix-input" data-pair="${escapeHtmlAttribute(pair)}" data-store="${escapeHtmlAttribute(contentMode)}" placeholder="${escapeHtmlAttribute(placeholder)}" rows="3">${escapeHtmlText(val)}</textarea>`
+                : `<input class="matrix-input" value="${escapeHtmlAttribute(val)}" data-pair="${escapeHtmlAttribute(pair)}" data-store="${escapeHtmlAttribute(contentMode)}">`;
 
             if (rowChar === colChar) {
                 rowHtml += `<td class="cell-diagonal ${cellClass}">
@@ -1091,6 +1139,7 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
     const startChars = getSelectedRanges(`${mode}_start`);
     const endChars = getSelectedRanges(`${mode}_end`);
     const normalizedModes = normalizeContentModes(contentModes);
+    const requireAllModes = mode === 'mem' && normalizedModes.length > 1;
 
     if (startChars.length === 0 || endChars.length === 0) return { error: 'alert_sel_range' };
 
@@ -1107,6 +1156,7 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
             const pair = start + end;
             const availableModes = getAvailablePairContentModes(pair, normalizedModes);
             if (availableModes.length === 0) return;
+            if (requireAllModes && availableModes.length !== normalizedModes.length) return;
 
             const statuses = availableModes.map((item) => getPairData(pair, item)).filter(Boolean);
 
