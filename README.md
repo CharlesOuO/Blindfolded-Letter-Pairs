@@ -1,105 +1,165 @@
 # Blindfolded Letter Pairs Practice
 
-> **An SM-2 Spaced Repetition memory tool designed specifically for Rubik's Cube blindfolded (BLD) solvers. Fully supports both English and Chinese blindfolded solving systems.**
+Letter pair practice for blindfolded solving, with bilingual UI, flashcards, typing test, table editing, and built-in algorithm references for corners and edges.
 
-[繁體中文版介紹請往下捲動 / Scroll down for Traditional Chinese version](#盲解字母對記憶練習工具-blindfolded-letter-pairs-practice)
+[Traditional Chinese version / 繁體中文版](#繁體中文版)
 
-This web application is built to help speedcubers efficiently memorize and master "Letter Pairs" for blindfolded solving. By integrating the widely-used **SM-2 Spaced Repetition Algorithm**, the system automatically schedules your review frequency based on your proficiency, significantly improving memory retention and recall speed.
+## Overview
 
----
+This project helps BLD solvers manage and review:
 
-## Core Features
+- `Words` for letter pairs
+- `Corners` algorithms
+- `Edges` algorithms
 
-### 1. Universal Encoding Support & List Management
-Manage your personal encoding database with complete flexibility.
-* **Multi-System Compatibility:** Whether you use standard English letter pairs (like the Speffz scheme) or Chinese encoding systems (such as Bopomofo, Pinyin, or custom Chinese characters), the input fields and logic fully support your text.
-* **Dual View Modes:** Toggle between "List Mode" and "Full Grid Mode" to quickly browse all your pairs.
-* **Custom Encodings:** Click the table headers or enter edit mode to freely add or modify your specific images or words for each pair.
-* **Proficiency Visualization:** The system automatically color-codes the status of each letter pair (Proficient, Hesitant, Unfamiliar, Hidden).
+It supports custom coding systems, range-based practice, local backup/import, and built-in default commutators derived from BLDDB for algorithm study.
 
-### 2. Flashcards (Memory Practice)
-Conduct recall tests using flashcards and review scientifically with the SM-2 algorithm.
-* **Custom Ranges:** Freely select the starting and ending letters you want to practice (supports Select All / Clear All).
-* **Self-Assessment Mechanism:** After flipping a card, rate your recall fluency. The system uses this to calculate the optimal time for the next review.
-* **Hotkey Support:** Use the `Space` bar to quickly advance to the next card.
+## Features
+
+### 1. List Input
+
+- Switch between `List` and `Table` layouts
+- Switch between `Words` and `Algorithm`
+- Under `Algorithm`, edit `Corners` and `Edges` separately
+- Built-in BLDDB defaults appear as placeholders when your own algorithm field is empty
+- Table cells support familiarity colors and quick editing
+
+### 2. Flashcards
+
+- Practice `Words`, `Corners`, and `Edges` separately or together
+- When multiple modes are enabled, flashcards use the shared eligible set for those modes
+- Answers show each enabled content block that exists for that pair
+- Review scheduling is due-date based
+
+Current review timing:
+
+- `Hard`: due again in 10 minutes
+- `Slow`: due again in 6 hours
+- `Good`: scheduled by day-based spaced repetition
+
+If no card is currently due, the app falls back to the earliest upcoming cards and tries to avoid repeating the same card within the last 5 flashcards.
 
 ### 3. Typing Test
-Validate your memory and challenge your instantaneous reaction speed.
-* **Time Challenge:** Precisely track the time it takes to recall and type the encoding for each letter pair.
-* **Range Filtering:** Filter by specific letter ranges for targeted training on your weak spots.
 
-### 4. Data Backup & Restore
-Keep your carefully crafted encoding database safe.
-* **Multiple Export Formats:** Export a system backup file (`.json`) to retain your complete learning progress, or export an Excel spreadsheet (`.csv`) for external editing.
-* **Import & Reset:** Easily import previous backup files or clear all data to start fresh.
+- Practice `Words` with a timer
+- Filter by start and end ranges
+- Results update the same familiarity / scheduling data
 
----
+### 4. Built-in Algorithms
 
-## Quick Start Guide
+- Built-in defaults are stored locally in the project
+- No runtime fetch is required
+- Current source: [BLDDB](https://blddb.net/)
+- Current notation: `commutator-first`
+- Current buffer mapping used for built-in pair defaults: Speffz `C` buffer
 
-1. **Create Encodings:** Go to the "List & Input" tab and enter your standard words or images for your blindfolded pairs.
-2. **Flashcard Practice:** Visit the "Flashcards" section for daily review. Be honest about your recall speed and click the appropriate proficiency button.
-3. **Speed Testing:** Once most of your pairs reach "Proficient", use the "Typing Test" to train your brain's retrieval speed.
-4. **Regular Backups:** Regularly go to "Data Backup" and export a `.json` file to keep your data safe.
+### 5. Backup and Restore
 
----
+- Export backup as `.json`
+- Export word table as `.csv`
+- Import previous backups
+- Backup includes:
+  - word data
+  - corner algorithms
+  - edge algorithms
+  - familiarity / review state
+  - custom character set
 
-## Author & Copyright Info
+## Quick Start
 
-* **Author:** Charles Lin
-* **WCA ID:** [2020LINC05](https://www.worldcubeassociation.org/persons/2020LINC05)
-* **Live Demo:** [Blindfolded Letter Pairs Website](https://charlesouo.github.io/Blindfolded-Letter-Pairs/)
+1. Open `List Input`
+2. Fill in your `Words`
+3. Switch to `Algorithm` and fill in `Corners` / `Edges` as needed
+4. Use `Flashcards` for review
+5. Use `Typing Test` for word recall speed
+6. Export a `.json` backup regularly
 
----
+## Tech Notes
 
-# 盲解字母對記憶練習工具 (Blindfolded Letter Pairs Practice)
+- Data is stored in browser `localStorage`
+- Built-in algorithm defaults are loaded from `built-in-algorithms.js`
+- The UI supports English and Traditional Chinese
 
-> **專為魔術方塊盲解（Blindfolded Solving）玩家打造的 SM-2 間隔重複記憶工具。完美支援中文與英文盲解系統。**
+## Author
 
-這是一個幫助魔術方塊玩家高效記憶與熟悉「盲解字母對」的網頁應用程式。透過整合著名的 **SM-2 間隔重複演算法（Spaced Repetition Algorithm）**，系統能夠根據你的熟練度自動安排複習頻率，大幅提升記憶力與反應速度。
-
----
-
-## 核心功能特色
-
-### 1. 支援雙語系統與列表管理
-完全自由地管理你的專屬編碼庫。
-* **全系統相容：** 無論您使用的是傳統英文編碼（如 Speffz 系統），還是中文盲解系統（如注音、拼音或自訂中文字），系統的輸入與配對邏輯皆可完美支援。
-* **雙模式檢視：** 提供「列表模式」與「全表模式（矩陣視圖）」，方便快速瀏覽所有字母對。
-* **自訂編碼：** 點擊表頭或進入編輯模式，即可自由修改或新增專屬於你的字母對編碼。
-* **熟練度視覺化：** 系統會自動以不同顏色標記每個字母對的狀態（熟練、猶豫、不熟、隱藏），學習進度一目瞭然。
-
-### 2. 記憶翻牌 (Flashcards)
-利用閃卡進行回憶測試，並透過 SM-2 演算法科學化複習。
-* **自訂範圍：** 可針對開頭與結尾字母自由選擇要練習的範圍（支援全選/全消）。
-* **自我評估機制：** 翻牌後，根據回憶的順暢度選擇「不熟」、「猶豫」或「熟練」，系統將藉此計算下次出現的時機。
-* **快捷鍵支援：** 支援使用 `Space`（空白鍵）快速進入下一題，讓練習過程更流暢。
-
-### 3. 打字測驗 (Typing Test)
-驗證記憶並挑戰瞬間反應速度。
-* **計時挑戰：** 精準計算回答每個字母對編碼所需的時間，找出你的記憶盲區。
-* **範圍篩選：** 支援自訂字母範圍，幫助你針對特定弱點進行特訓。
-
-### 4. 資料備份與還原 (Data Backup)
-不用擔心辛苦建立的編碼庫遺失，完整掌握自己的數據。
-* **多元匯出格式：** 支援匯出系統備份檔（`.json`）以完整保留學習進度，或是匯出 Excel 表格（`.csv`）方便在其他軟體中編輯。
-* **匯入與重置：** 可隨時匯入之前備份的檔案，或是點擊「清空所有資料」重新開始。
+- Author: Charles Lin
+- WCA ID: [2020LINC05](https://www.worldcubeassociation.org/persons/2020LINC05)
+- Demo: [Blindfolded Letter Pairs Website](https://charlesouo.github.io/Blindfolded-Letter-Pairs/)
 
 ---
 
-## 快速開始指南
+# 繁體中文版
 
-1. **建立編碼：** 首先進入「列表輸入」，將你常用的盲解字母對單字或圖像輸入系統。
-2. **翻牌練習：** 前往「記憶翻牌」進行每日複習。誠實面對自己的記憶狀況，精準點擊熟練度按鈕。
-3. **速度測驗：** 當大部分字母對都達到「熟練」後，使用「打字測驗」提升大腦提取編碼的速度。
-4. **定期備份：** 建議定期前往「資料備份」匯出 `.json` 檔案，確保資料安全。
+這是一個給盲解使用者練習 `Letter Pairs`、`Corners`、`Edges` 的網頁工具，支援中英文介面、字卡、打字測驗、表格式編輯，以及內建的 BLDDB 公式參考。
 
----
+## 功能簡介
 
-## 作者與版權資訊
+### 1. List Input
 
-* **Author:** Charles Lin
-* **WCA ID:** [2020LINC05](https://www.worldcubeassociation.org/persons/2020LINC05)
-* **Live Demo:** [Blindfolded Letter Pairs Website](https://charlesouo.github.io/Blindfolded-Letter-Pairs/)
+- 可切換 `List` / `Table`
+- 可切換 `Words` / `Algorithm`
+- `Algorithm` 底下再分成 `Corners` 與 `Edges`
+- 若你沒有自己輸入公式，會先顯示內建的 BLDDB commutator placeholder
+- 表格模式可直接編輯，並搭配熟悉度顏色管理
 
-> **Pro-Tip:** 盲解的關鍵在於極致的熟悉。每天花 10 到 15 分鐘使用記憶翻牌功能，SM-2 演算法會幫你把最不熟的組合挑出來。持續一個月，你的編碼反應時間絕對會有顯著的突破！
+### 2. Flashcards
+
+- 可分別練習 `Words`、`Corners`、`Edges`
+- 也可以同時開多個模式一起練
+- 翻卡時會顯示該 pair 對應的內容
+- 抽卡邏輯改為 `due date` 制
+
+目前複習時間規則：
+
+- `Hard`：10 分鐘後再次到期
+- `Slow`：6 小時後再次到期
+- `Good`：依天數間隔排程
+
+若目前沒有任何卡已到期，系統會先挑最近即將到期的卡，並盡量避免最近 5 張內重複出現同一張。
+
+### 3. Typing Test
+
+- 目前主要用來練 `Words`
+- 可用起始 / 結束範圍過濾
+- 測驗結果會更新同一套熟悉度與排程資料
+
+### 4. 內建公式
+
+- 公式已經直接存在專案內，不需要每次上網抓
+- 目前來源是 [BLDDB](https://blddb.net/)
+- 目前預設顯示格式為 `commutator-first`
+- 目前 pair 預設映射使用 Speffz `C` buffer
+
+### 5. 備份與還原
+
+- 可匯出 `.json` 備份
+- 可匯出 `.csv` 字詞表
+- 可匯入舊備份
+
+備份內容包含：
+
+- 字詞資料
+- corner 公式
+- edge 公式
+- 熟悉度 / 複習進度
+- 自訂字元集
+
+## 使用方式
+
+1. 在 `List Input` 輸入 `Words`
+2. 切到 `Algorithm` 補上 `Corners` / `Edges`
+3. 到 `Flashcards` 進行複習
+4. 到 `Typing Test` 練習字詞反應速度
+5. 定期匯出 `.json` 備份
+
+## 技術補充
+
+- 資料存於瀏覽器 `localStorage`
+- 內建公式由 `built-in-algorithms.js` 提供
+- 介面支援英文與繁體中文
+
+## 作者資訊
+
+- Author: Charles Lin
+- WCA ID: [2020LINC05](https://www.worldcubeassociation.org/persons/2020LINC05)
+- Demo: [Blindfolded Letter Pairs Website](https://charlesouo.github.io/Blindfolded-Letter-Pairs/)
