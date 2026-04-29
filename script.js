@@ -20,12 +20,14 @@ let isWaitingTestNext = true;
 let timerInterval = null;
 let lastMemPair = null;
 let lastTestPair = null;
+let recentMemPairs = [];
 let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
 let isMatrixMode = false;
 let currentListViewMode = 'list';
 let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
+const MEMORY_REPEAT_GAP = 5;
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -113,7 +115,7 @@ Object.assign(translations['zh-TW'], {
     confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210 English a-x \u4ee3\u78bc\u55ce\uff1f",
     confirm_switch_chars_zh: "\u8981\u5207\u56de\u6ce8\u97f3\u4ee3\u78bc\u55ce\uff1f",
     btn_toggle_lang: "English / \u4e2d\u6587",
-    page_title: "Letter Pairs \u7df4\u7fd2 (SM-2)",
+    page_title: "Letter Pairs \u7df4\u7fd2",
     sel_prefix: "\u5df2\u9078\uff1a"
 });
 
@@ -149,10 +151,14 @@ Object.assign(translations.en, {
     confirm_switch_chars_en: "Also switch to English a-x codes?",
     confirm_switch_chars_zh: "Switch back to Zhuyin codes as well?",
     btn_toggle_lang: "\u4e2d\u6587 / English",
-    page_title: "Letter Pairs Practice (SM-2)"
+    page_title: "Letter Pairs Practice"
 });
 
 const SM2_SETTINGS = { defaultEf: 2.5, minEf: 1.3, intervals: [1, 3] };
+const REVIEW_DELAY_SETTINGS = {
+    hardMinutes: 10,
+    slowHours: 6
+};
 
 function isAlgorithmContentMode(contentMode = 'word') {
     return contentMode === 'corner' || contentMode === 'edge';
@@ -185,8 +191,17 @@ function calculateNextReview(currentData, grade) {
         else if (nextRepetition === 2) nextInterval = SM2_SETTINGS.intervals[1];
         else nextInterval = Math.round(card.interval * nextEf);
     }
-    const nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
     let nextColor = grade >= 4 ? 'green' : (grade === 3 ? 'yellow' : 'red');
+    let nextDueDate;
+
+    if (grade < 3) {
+        nextDueDate = Date.now() + (REVIEW_DELAY_SETTINGS.hardMinutes * 60 * 1000);
+    } else if (grade === 3) {
+        nextDueDate = Date.now() + (REVIEW_DELAY_SETTINGS.slowHours * 60 * 60 * 1000);
+    } else {
+        nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
+    }
+
     return { interval: nextInterval, repetition: nextRepetition, ef: nextEf, dueDate: nextDueDate, color: nextColor };
 }
 
@@ -1079,60 +1094,17 @@ function markMemStatus(gradeType) {
     nextMemoryCard();
 }
 
-function getCandidatePool(mode, contentModes = ['word']) {
-    return getStudyCandidatePool(mode, contentModes);
-
-    const startChars = getSelectedRanges(`${mode}_start`);
-    const endChars = getSelectedRanges(`${mode}_end`);
+function getPairDueDate(pair, contentModes = ['word']) {
     const normalizedModes = normalizeContentModes(contentModes);
+    const dueDates = normalizedModes.map((mode) => {
+        const status = getPairData(pair, mode);
+        if (!status) return 0;
 
-    if (startChars.length === 0 || endChars.length === 0) return { error: 'alert_sel_range' };
-
-    // 分類桶
-    let groupNew = [];
-    let groupRed = [];
-    let groupYellow = [];
-    let groupGreen = [];
-
-    chars.forEach(start => {
-        if (!startChars.includes(start)) return;
-        chars.forEach(end => {
-            if (!endChars.includes(end)) return;
-
-            const pair = start + end;
-
-            // 排除隱藏
-            const availableModes = getAvailablePairContentModes(pair, normalizedModes);
-            if (availableModes.length === 0) return;
-            const statuses = availableModes.map((item) => getPairData(pair, item)).filter(Boolean);
-
-            // 必須在字典中有資料
-            if (dict[pair]) {
-                if (!status) {
-                    groupNew.push(pair);
-                } else if (status.color === 'red') {
-                    // 為了避免永遠只複習某幾個，這裡可以加入一點隨機性或檢查 dueDate
-                    // 但用戶要求「優先」，所以先嚴格執行
-                    groupRed.push(pair);
-                } else if (status.color === 'yellow') {
-                    groupYellow.push(pair);
-                } else {
-                    groupGreen.push(pair);
-                }
-            }
-        });
+        const dueDate = Number(status.dueDate);
+        return Number.isFinite(dueDate) ? dueDate : 0;
     });
 
-    // 檢查是否有任何有效資料
-    if (groupNew.length === 0 && groupRed.length === 0 && groupYellow.length === 0 && groupGreen.length === 0) {
-        return { error: getNoDataErrorKey(normalizedModes) };
-    }
-
-    // 優先順序：沒測驗過 (New) > 不熟悉 (Red) > 猶豫 (Yellow) > 精熟 (Green)
-    if (groupNew.length > 0) return { pool: groupNew };
-    if (groupRed.length > 0) return { pool: groupRed };
-    if (groupYellow.length > 0) return { pool: groupYellow };
-    return { pool: groupGreen };
+    return dueDates.length > 0 ? Math.min(...dueDates) : 0;
 }
 
 function getStudyCandidatePool(mode, contentModes = ['word']) {
@@ -1140,13 +1112,11 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
     const endChars = getSelectedRanges(`${mode}_end`);
     const normalizedModes = normalizeContentModes(contentModes);
     const requireAllModes = mode === 'mem' && normalizedModes.length > 1;
+    const now = Date.now();
 
     if (startChars.length === 0 || endChars.length === 0) return { error: 'alert_sel_range' };
 
-    let groupNew = [];
-    let groupRed = [];
-    let groupYellow = [];
-    let groupGreen = [];
+    const candidates = [];
 
     chars.forEach(start => {
         if (!startChars.includes(start)) return;
@@ -1158,29 +1128,32 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
             if (availableModes.length === 0) return;
             if (requireAllModes && availableModes.length !== normalizedModes.length) return;
 
-            const statuses = availableModes.map((item) => getPairData(pair, item)).filter(Boolean);
-
-            if (statuses.length < availableModes.length) {
-                groupNew.push(pair);
-            } else if (statuses.some((status) => status.color === 'red')) {
-                groupRed.push(pair);
-            } else if (statuses.some((status) => status.color === 'yellow')) {
-                groupYellow.push(pair);
-            } else {
-                groupGreen.push(pair);
-            }
+            candidates.push({
+                pair,
+                dueDate: getPairDueDate(pair, availableModes)
+            });
         });
     });
 
-    if (groupNew.length === 0 && groupRed.length === 0 && groupYellow.length === 0 && groupGreen.length === 0) {
+    if (candidates.length === 0) {
         return { error: getNoDataErrorKey(normalizedModes) };
     }
 
-    if (groupNew.length > 0) return { pool: groupNew };
-    if (groupRed.length > 0) return { pool: groupRed };
-    if (groupYellow.length > 0) return { pool: groupYellow };
-    return { pool: groupGreen };
+    const dueCandidates = candidates.filter((candidate) => candidate.dueDate <= now);
+    const activeCandidates = dueCandidates.length > 0 ? dueCandidates : candidates;
+    const earliestDueDate = Math.min(...activeCandidates.map((candidate) => candidate.dueDate));
+    const pool = activeCandidates
+        .filter((candidate) => candidate.dueDate === earliestDueDate)
+        .map((candidate) => candidate.pair);
+
+    return {
+        pool,
+        dueDate: earliestDueDate,
+        hasDueCandidates: dueCandidates.length > 0,
+        candidates
+    };
 }
+
 
 function nextMemoryCard() {
     const result = getStudyCandidatePool('mem', getSelectedMemoryContentModes());
@@ -1197,10 +1170,24 @@ function nextMemoryCard() {
     }
 
     let pool = result.pool;
+    if (!result.hasDueCandidates && Array.isArray(result.candidates) && recentMemPairs.length > 0) {
+        const recentSet = new Set(recentMemPairs.slice(-MEMORY_REPEAT_GAP));
+        const eligibleCandidates = result.candidates.filter((candidate) => !recentSet.has(candidate.pair));
+
+        if (eligibleCandidates.length > 0) {
+            const earliestEligibleDueDate = Math.min(...eligibleCandidates.map((candidate) => candidate.dueDate));
+            pool = eligibleCandidates
+                .filter((candidate) => candidate.dueDate === earliestEligibleDueDate)
+                .map((candidate) => candidate.pair);
+        }
+    }
+
     if (pool.length > 1 && lastMemPair) pool = pool.filter(p => p !== lastMemPair);
 
     currentPair = pool[Math.floor(Math.random() * pool.length)];
     lastMemPair = currentPair;
+    recentMemPairs.push(currentPair);
+    if (recentMemPairs.length > MEMORY_REPEAT_GAP) recentMemPairs = recentMemPairs.slice(-MEMORY_REPEAT_GAP);
 
     document.getElementById('mem-q').innerText = currentPair.toUpperCase();
     document.getElementById('mem-a').classList.remove('show');
