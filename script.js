@@ -38,8 +38,10 @@ let isMatrixMode = false;
 let currentListViewMode = 'list';
 let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
+let currentTab = 'list';
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
 const MEMORY_REPEAT_GAP = 5;
+const TAB_ORDER = ['list', 'memory', 'test', 'data'];
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -384,7 +386,8 @@ function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
     migrateLegacyFormulaData();
-    initUI(); setupDynamicUI(); applyLanguage(); updateLayoutMode();
+    currentTab = document.querySelector('.view-section.active')?.id?.replace('view-', '') || 'list';
+    initUI(); setupDynamicUI(); enhanceMemoryCardLayout(); applyLanguage(); updateLayoutMode();
     setupEventListeners();
     updateMemoryContentModeButtons();
 }
@@ -543,7 +546,6 @@ function setupDynamicUI() {
 
     if (modeRow) {
         modeRow.className = 'list-mode-switcher';
-        modeRow.style.marginBottom = '16px';
         modeRow.innerHTML = '';
         modeRow.appendChild(createListModeGroup('switch_layout', [listButton, matrixButton], 'list-mode-group-layout'));
         modeRow.appendChild(createListModeGroup('switch_content', [wordButton, algorithmButton], 'list-mode-group-content'));
@@ -595,10 +597,7 @@ function setupDynamicUI() {
     const memoryPanel = document.querySelector('#view-memory .control-panel');
     if (memoryPanel && !document.getElementById('btn-mem-content-word')) {
         const modeRow = document.createElement('div');
-        modeRow.className = 'control-row';
-        modeRow.style.gap = '10px';
-        modeRow.style.flexWrap = 'wrap';
-        modeRow.style.marginBottom = '16px';
+        modeRow.className = 'control-row control-row-wrap memory-mode-row';
 
         const wordButton = document.createElement('button');
         wordButton.id = 'btn-mem-content-word';
@@ -628,6 +627,41 @@ function setupDynamicUI() {
     }
 }
 
+function enhanceMemoryCardLayout() {
+    const memoryCard = document.getElementById('memory-card');
+    const gradingArea = document.getElementById('mem-grading-area');
+    const questionEl = document.getElementById('mem-q');
+    const answerEl = document.getElementById('mem-a');
+    const hintEl = document.getElementById('mem-hint');
+
+    if (!memoryCard || !gradingArea || !questionEl || !answerEl || !hintEl) return;
+    if (memoryCard.querySelector('.flashcard-stage')) return;
+
+    const stage = document.createElement('div');
+    stage.className = 'flashcard-stage';
+
+    const scene = document.createElement('div');
+    scene.className = 'flashcard-3d';
+
+    const front = document.createElement('div');
+    front.className = 'flashcard-face flashcard-front';
+
+    const back = document.createElement('div');
+    back.className = 'flashcard-face flashcard-back';
+
+    hintEl.classList.add('flashcard-subtext');
+    answerEl.classList.add('flashcard-answer');
+
+    front.appendChild(questionEl);
+    front.appendChild(hintEl);
+    back.appendChild(answerEl);
+    back.appendChild(gradingArea);
+    scene.appendChild(front);
+    scene.appendChild(back);
+    stage.appendChild(scene);
+    memoryCard.appendChild(stage);
+}
+
 function createListModeGroup(labelKey, buttons, groupId) {
     const group = document.createElement('div');
     group.id = groupId;
@@ -653,9 +687,10 @@ function createListModeGroup(labelKey, buttons, groupId) {
 
 function setActionButtonActive(button, isActive) {
     if (!button) return;
-    button.style.borderColor = isActive ? "var(--primary-color)" : "#cbd5e1";
-    button.style.color = isActive ? "var(--primary-color)" : "#64748b";
-    button.style.backgroundColor = isActive ? "#eff6ff" : "white";
+    button.style.borderColor = '';
+    button.style.color = '';
+    button.style.backgroundColor = '';
+    button.classList.toggle('is-active', isActive);
 }
 
 function normalizeContentModes(contentModes = ['word']) {
@@ -1154,16 +1189,62 @@ function applyLanguage() {
     chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
     if (currentVal && chars.includes(currentVal)) listSel.value = currentVal;
     if (isWaitingTestNext) document.getElementById('test-btn').innerText = t('btn_start_test'); else document.getElementById('test-btn').innerText = t('btn_submit');
-    if (isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; else document.getElementById('mem-hint').style.visibility = 'visible';
-    if (isMemAnswerShown) document.getElementById('mem-hint').style.visibility = 'hidden'; else document.getElementById('mem-hint').style.visibility = 'visible';
+    setMemoryCardFlipped(isMemAnswerShown);
     updateDropdownLabel('mem_start'); updateDropdownLabel('mem_end');
     updateDropdownLabel('test_start'); updateDropdownLabel('test_end');
     updateMemoryContentModeButtons();
     toggleViewMode(currentListViewMode);
 }
 
-function toggleDropdown(id) { const content = document.getElementById(`${id}-content`); const isShown = content.classList.contains('show'); closeAllDropdowns(); if (!isShown) content.classList.add('show'); }
-function closeAllDropdowns() { document.querySelectorAll('.dropdown-content').forEach(el => el.classList.remove('show')); }
+function setMemoryCardFlipped(isFlipped) {
+    const memoryCard = document.getElementById('memory-card');
+    const hintEl = document.getElementById('mem-hint');
+    if (memoryCard) memoryCard.classList.toggle('is-flipped', isFlipped);
+    if (hintEl) hintEl.classList.toggle('is-hidden', isFlipped);
+}
+
+function updateMemoryAnswerSize(answerEl, answerText = '') {
+    if (!answerEl) return;
+
+    const normalizedText = String(answerText ?? '').trim();
+    const compactText = normalizedText.replace(/\s+/g, ' ');
+    const lineLengths = normalizedText.split('\n').map((line) => line.trim().length);
+    const longestLine = lineLengths.length > 0 ? Math.max(...lineLengths) : 0;
+    const totalLength = compactText.length;
+
+    answerEl.classList.remove('answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
+
+    if (longestLine <= 8 && totalLength <= 18) {
+        answerEl.classList.add('answer-size-short');
+    } else if (longestLine <= 22 && totalLength <= 52) {
+        answerEl.classList.add('answer-size-medium');
+    } else if (longestLine <= 38 && totalLength <= 90) {
+        answerEl.classList.add('answer-size-long');
+    } else {
+        answerEl.classList.add('answer-size-dense');
+    }
+}
+
+function setDropdownOpenState(content, isOpen) {
+    if (!content) return;
+    content.classList.toggle('show', isOpen);
+    const wrapper = content.closest('.dropdown-wrapper');
+    if (wrapper) wrapper.classList.toggle('is-open', isOpen);
+    const toggleButton = wrapper?.querySelector('.dropdown-toggle-btn');
+    if (toggleButton) toggleButton.setAttribute('aria-expanded', String(isOpen));
+}
+
+function toggleDropdown(id) {
+    const content = document.getElementById(`${id}-content`);
+    if (!content) return;
+    const isShown = content.classList.contains('show');
+    closeAllDropdowns();
+    if (!isShown) setDropdownOpenState(content, true);
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.dropdown-content').forEach(el => setDropdownOpenState(el, false));
+}
 
 // Modified to handle generic ID
 function updateDropdownLabel(key) {
@@ -1185,7 +1266,7 @@ function renderCheckboxes(containerId, inputName) {
     container.innerHTML = '';
     chars.forEach((c) => {
         const label = document.createElement('label');
-        label.style = 'display:flex;align-items:center;';
+        label.className = 'checkbox-chip';
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.value = c;
@@ -1207,14 +1288,25 @@ function getSelectedRanges(inputName) {
 function triggerAction(tabId) { if (tabId === 'view-memory') { if (isMemAnswerShown) nextMemoryCard(); else toggleMemoryAnswer(); } else if (tabId === 'view-test') { if (isWaitingTestNext) startTestQuestion(); } }
 
 function switchTab(tab) {
-    document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active'));
+    if (tab === currentTab) return;
+
+    closeAllDropdowns();
+    const currentIndex = TAB_ORDER.indexOf(currentTab);
+    const nextIndex = TAB_ORDER.indexOf(tab);
+    const enterClass = nextIndex >= currentIndex ? 'tab-enter-forward' : 'tab-enter-backward';
+
+    document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active', 'tab-enter-forward', 'tab-enter-backward'));
     document.querySelectorAll('.nav-btn').forEach(e => e.classList.remove('active'));
-    document.getElementById(`view-${tab}`).classList.add('active');
+    const nextSection = document.getElementById(`view-${tab}`);
+    nextSection.classList.add('active');
+    void nextSection.offsetWidth;
+    nextSection.classList.add(enterClass);
     const btnIndex = { 'list': 0, 'memory': 1, 'test': 2, 'data': 3 };
     document.querySelectorAll('.nav-btn')[btnIndex[tab]].classList.add('active');
     const container = document.getElementById('main-container');
     if (tab === 'list' && isMatrixListView()) container.classList.add('wide-mode'); else container.classList.remove('wide-mode');
     if (timerInterval) clearInterval(timerInterval);
+    currentTab = tab;
     if (tab === 'list') renderCurrentListView();
     if (tab === 'memory') nextMemoryCard();
     if (tab === 'test') { document.getElementById('test-feedback').innerText = ''; document.getElementById('test-correct-msg').innerText = ''; isWaitingTestNext = true; applyLanguage(); }
@@ -1329,9 +1421,9 @@ function nextMemoryCard() {
         currentPair = null;
         document.getElementById('mem-q').innerText = '--';
         document.getElementById('mem-a').innerText = '';
-        document.getElementById('mem-a').classList.remove('show');
+        document.getElementById('mem-a').classList.remove('show', 'answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
         document.getElementById('mem-grading-area').classList.add('hidden');
-        document.getElementById('mem-hint').style.visibility = 'visible';
+        setMemoryCardFlipped(false);
         isMemAnswerShown = false;
         alert(t(result.error));
         return;
@@ -1358,9 +1450,9 @@ function nextMemoryCard() {
     if (recentMemPairs.length > MEMORY_REPEAT_GAP) recentMemPairs = recentMemPairs.slice(-MEMORY_REPEAT_GAP);
 
     document.getElementById('mem-q').innerText = currentPair.toUpperCase();
-    document.getElementById('mem-a').classList.remove('show');
+    document.getElementById('mem-a').classList.remove('show', 'answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
     document.getElementById('mem-grading-area').classList.add('hidden');
-    document.getElementById('mem-hint').style.visibility = 'visible';
+    setMemoryCardFlipped(false);
 
     isMemAnswerShown = false; applyLanguage();
 }
@@ -1368,11 +1460,13 @@ function nextMemoryCard() {
 function toggleMemoryAnswer() {
     if (!currentPair || isMemAnswerShown) return;
     const answerEl = document.getElementById('mem-a');
-    answerEl.innerText = formatMemoryAnswer(currentPair, getSelectedMemoryContentModes());
+    const answerText = formatMemoryAnswer(currentPair, getSelectedMemoryContentModes());
+    answerEl.innerText = answerText;
+    updateMemoryAnswerSize(answerEl, answerText);
 
     answerEl.classList.add('show');
     document.getElementById('mem-grading-area').classList.remove('hidden');
-    document.getElementById('mem-hint').style.visibility = 'hidden';
+    setMemoryCardFlipped(true);
     isMemAnswerShown = true; applyLanguage();
 }
 

@@ -9,7 +9,7 @@
     <title data-i18n="page_title">3BLD(3 style & letter pairs) practice</title>
     <link rel="stylesheet" href="style.css">
 
-    <style>
+    <style media="not all" data-legacy-inline-styles="true">
         /* =========================================
            1. 列表模式：大卡片樣式 (List Mode Cards)
            ========================================= */
@@ -245,9 +245,8 @@
 
         <div id="view-list" class="view-section active">
             <div class="control-panel">
-                <div class="control-row" style="margin-bottom: 16px;">
-                    <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')"
-                        style="border-color:var(--primary-color); color:var(--primary-color);">📋 <span
+                <div class="control-row list-controls-row">
+                    <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')">📋 <span
                             data-i18n="mode_card">列表模式</span></button>
                     <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')">▦ <span
                             data-i18n="mode_matrix">表格模式</span></button>
@@ -255,21 +254,19 @@
 
                 <div id="list-mode-controls">
                     <div class="control-row">
-                        <label data-i18n="lbl_start_char" style="font-weight:500;">開頭：</label>
-                        <select id="char-select" onchange="renderList()"
-                            style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; outline:none; font-size:16px; cursor: pointer;"></select>
+                        <label data-i18n="lbl_start_char" class="control-label">開頭：</label>
+                        <select id="char-select" onchange="renderList()" class="form-select"></select>
                     </div>
                 </div>
 
                 <div id="matrix-settings" class="hidden">
-                    <div class="control-row" style="gap: 15px; margin-bottom: 12px;">
-                        <span style="font-size:0.85rem; color:#64748b;" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
-                        <span id="active-pair-label"
-                            style="font-weight:bold; color:var(--primary-color); margin-left:10px;"></span>
+                    <div class="control-row matrix-settings-row">
+                        <span class="matrix-settings-hint" data-i18n="hint_matrix_edit">提示：點擊表頭可修改代碼</span>
+                        <span id="active-pair-label" class="active-pair-label"></span>
 
                         <!-- Read-only Toggle -->
-                        <div class="toggle-switch-wrapper" style="display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size:0.9rem; color:#64748b;" data-i18n="lbl_edit_mode">編輯模式</span>
+                        <div class="toggle-switch-wrapper">
+                            <span class="toggle-switch-label" data-i18n="lbl_edit_mode">編輯模式</span>
                             <label class="switch">
                                 <input type="checkbox" id="matrix-edit-toggle" onchange="toggleMatrixEdit(this.checked)"
                                     checked>
@@ -279,14 +276,14 @@
 
                         <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars">回復預設</button>
                     </div>
-                    <div class="control-row" style="gap: 8px;">
+                    <div class="control-row matrix-grade-row">
                         <button class="btn-grade bg-green" onclick="setMatrixStatus('green')"
                             data-i18n="fb_good">熟練</button>
                         <button class="btn-grade bg-yellow" onclick="setMatrixStatus('yellow')"
                             data-i18n="fb_slow">猶豫</button>
                         <button class="btn-grade bg-red" onclick="setMatrixStatus('red')"
                             data-i18n="fb_wrong">不熟</button>
-                        <button class="btn-grade bg-gray" onclick="setMatrixStatus('gray')" style="margin-left:8px;"
+                        <button class="btn-grade bg-gray matrix-grade-offset" onclick="setMatrixStatus('gray')"
                             data-i18n="btn_hide">隱藏</button>
                     </div>
                 </div>
@@ -300,43 +297,41 @@
                 <table id="full-matrix" class="matrix-table"></table>
             </div>
 
-            <div id="matrix-footer" class="control-row hidden" style="margin-top: 20px;">
-                <button class="action-btn" onclick="resetAllColors()" style="font-size: 0.85rem; color: #64748b;"
+            <div id="matrix-footer" class="control-row hidden matrix-footer-shell">
+                <button class="action-btn matrix-footer-button" onclick="resetAllColors()"
                     data-i18n="btn_reset_color">🔄 重置所有顏色</button>
             </div>
         </div>
 
         <div id="view-memory" class="view-section">
             <div class="control-panel">
-                <div class="control-row" style="gap:10px; flex-wrap:wrap;">
-                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                <div class="control-row control-row-wrap">
+                    <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_start"
                             style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">開頭：</label>
-                        <button id="mem_start-btn" onclick="toggleDropdown('mem_start')" class="action-btn"
+                        <button id="mem_start-btn" onclick="toggleDropdown('mem_start')" class="action-btn dropdown-toggle-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="mem_start-content">
-                            <div
-                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('mem_start', true)" style="flex:1;"
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_start', true)" style="flex:1;"
                                     data-i18n="sel_full">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('mem_start', false)" style="flex:1;"
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_start', false)" style="flex:1;"
                                     data-i18n="sel_none">全消</button>
                             </div>
                             <div id="mem-start-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
 
-                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                    <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_end"
                             style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">結尾：</label>
-                        <button id="mem_end-btn" onclick="toggleDropdown('mem_end')" class="action-btn"
+                        <button id="mem_end-btn" onclick="toggleDropdown('mem_end')" class="action-btn dropdown-toggle-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="mem_end-content">
-                            <div
-                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('mem_end', true)" style="flex:1;"
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_end', true)" style="flex:1;"
                                     data-i18n="sel_full">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('mem_end', false)" style="flex:1;"
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_end', false)" style="flex:1;"
                                     data-i18n="sel_none">全消</button>
                             </div>
                             <div id="mem-end-range-grid" class="checkbox-grid"></div>
@@ -345,11 +340,11 @@
                 </div>
             </div>
 
-            <div class="card-area" onclick="toggleMemoryAnswer()">
+            <div class="card-area flashcard-card" id="memory-card" onclick="toggleMemoryAnswer()">
                 <div class="question" id="mem-q">FO</div>
                 <div class="answer-text" id="mem-a">...</div>
 
-                <div style="color:#94a3b8; font-size:0.9rem; margin-top:10px; min-height: 20px;" id="mem-hint"
+                <div class="flashcard-subtext" id="mem-hint"
                     data-i18n="hint_click_flip">點擊卡片翻牌</div>
 
                 <div id="mem-grading-area" class="grading-btns hidden">
@@ -371,35 +366,33 @@
 
         <div id="view-test" class="view-section">
             <div class="control-panel">
-                <div class="control-row" style="gap:10px; flex-wrap:wrap;">
-                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                <div class="control-row control-row-wrap">
+                    <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_start"
                             style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">開頭：</label>
-                        <button id="test_start-btn" onclick="toggleDropdown('test_start')" class="action-btn"
+                        <button id="test_start-btn" onclick="toggleDropdown('test_start')" class="action-btn dropdown-toggle-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="test_start-content">
-                            <div
-                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('test_start', true)" style="flex:1;"
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('test_start', true)" style="flex:1;"
                                     data-i18n="sel_full">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('test_start', false)" style="flex:1;"
+                                <button class="btn-sm btn-flex" onclick="toggleAll('test_start', false)" style="flex:1;"
                                     data-i18n="sel_none">全消</button>
                             </div>
                             <div id="test-start-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
 
-                    <div class="dropdown-wrapper" style="flex:1; min-width:140px;">
+                    <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_end"
                             style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">結尾：</label>
-                        <button id="test_end-btn" onclick="toggleDropdown('test_end')" class="action-btn"
+                        <button id="test_end-btn" onclick="toggleDropdown('test_end')" class="action-btn dropdown-toggle-btn"
                             style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
                         <div class="dropdown-content" id="test_end-content">
-                            <div
-                                style="margin-bottom:8px; display:flex; gap:5px; padding-bottom:8px; border-bottom:1px solid #eee;">
-                                <button class="btn-sm" onclick="toggleAll('test_end', true)" style="flex:1;"
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('test_end', true)" style="flex:1;"
                                     data-i18n="sel_full">全選</button>
-                                <button class="btn-sm" onclick="toggleAll('test_end', false)" style="flex:1;"
+                                <button class="btn-sm btn-flex" onclick="toggleAll('test_end', false)" style="flex:1;"
                                     data-i18n="sel_none">全消</button>
                             </div>
                             <div id="test-end-range-grid" class="checkbox-grid"></div>
@@ -408,18 +401,16 @@
                 </div>
             </div>
             <div class="card-area-test">
-                <div id="timer"
-                    style="font-family:monospace; font-size:1.5rem; margin-bottom:15px; color:#64748b; background:#f1f5f9; display:inline-block; padding:5px 15px; border-radius:20px;">
-                    0.0s</div>
+                <div id="timer" class="timer-badge">0.0s</div>
                 <div class="question" id="test-q">?</div>
 
                 <textarea id="test-input" data-i18n-placeholder="ph_input" placeholder="Type here"></textarea>
 
-                <div id="test-feedback" style="margin-top:20px; font-weight:bold; min-height:28px; font-size:1.1rem;">
+                <div id="test-feedback" class="test-feedback">
                 </div>
-                <div id="test-correct-msg" style="margin-top:5px; min-height:28px;"></div>
+                <div id="test-correct-msg" class="test-correct-msg-shell"></div>
             </div>
-            <div style="text-align:center; margin-bottom:20px; margin-top:20px;">
+            <div class="test-action-row">
                 <button class="btn-primary" id="test-btn" onclick="startTestQuestion()" data-i18n="btn_start_test">開始測驗
                     (Space)</button>
             </div>
@@ -470,7 +461,7 @@
                         <div class="import-card">
                             <label data-i18n="lbl_select_file"
                                 style="font-weight:500; color:#475569; width:100%;">匯入檔案：</label>
-                            <div class="import-controls" style="width:100%;">
+                            <div class="import-controls import-controls-full">
                                 <input type="file" id="file-input" accept=".json" class="file-input">
                                 <button class="btn-import" onclick="importData()" data-i18n="btn_import">確認匯入</button>
                             </div>
@@ -511,7 +502,7 @@
                         d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
                 </svg></a>
         </div>
-        <div style="margin-bottom:8px;">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
+        <div class="footer-meta">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
     </footer>
 
     <script src="built-in-algorithms.js"></script>
