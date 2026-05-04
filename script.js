@@ -12,6 +12,18 @@ const CORNER_FORMULA_STATUS_KEY = 'bld_formula_corner_status_v1';
 const EDGE_FORMULA_STATUS_KEY = 'bld_formula_edge_status_v1';
 const LANG_KEY = 'bld_lang_v1';
 const CHARS_KEY = 'bld_chars_v1';
+const APP_STORAGE_KEYS = [
+    STORAGE_KEY,
+    STATUS_KEY,
+    LEGACY_FORMULA_STORAGE_KEY,
+    LEGACY_FORMULA_STATUS_KEY,
+    CORNER_FORMULA_STORAGE_KEY,
+    EDGE_FORMULA_STORAGE_KEY,
+    CORNER_FORMULA_STATUS_KEY,
+    EDGE_FORMULA_STATUS_KEY,
+    LANG_KEY,
+    CHARS_KEY
+];
 
 let currentPair = null;
 let isMemAnswerShown = false;
@@ -52,7 +64,7 @@ const translations = {
     'zh-TW': {
         nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "設定",
         lbl_start_char: "開頭代碼：", btn_reset_color: "重置熟悉度：",
-        lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題 (Space)", btn_start_test: "開始測驗 (Space)",
+        lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題", btn_start_test: "開始測驗 (Space)",
         btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter",
         title_settings: "設定", title_backup: "備份", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料",
         opt_json: "系統備份檔 (.json)", opt_csv: "Excel 表格 (.csv)", btn_export_exec: "匯出資料",
@@ -73,7 +85,7 @@ const translations = {
     'en': {
         nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Setting",
         lbl_start_char: "Start Code:", btn_reset_color: "Reset familiarity:",
-        lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next (Space)", btn_start_test: "Start Test (Space)",
+        lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next", btn_start_test: "Start Test (Space)",
         btn_submit: "Submit (Enter)", ph_input: "Type & Enter",
         title_settings: "Setting", title_backup: "Backup", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data",
         opt_json: "Backup File (.json)", opt_csv: "Excel Table (.csv)", btn_export_exec: "Export Data",
@@ -125,7 +137,7 @@ Object.assign(translations['zh-TW'], {
     confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210 English a-x \u4ee3\u78bc\u55ce\uff1f",
     confirm_switch_chars_zh: "\u8981\u5207\u56de\u6ce8\u97f3\u4ee3\u78bc\u55ce\uff1f",
     btn_toggle_lang: "English / \u4e2d\u6587",
-    page_title: "Letter Pairs \u7df4\u7fd2",
+    page_title: "3BLD(3 style & letter pairs) practice",
     sel_prefix: "\u5df2\u9078\uff1a"
 });
 
@@ -161,7 +173,7 @@ Object.assign(translations.en, {
     confirm_switch_chars_en: "Also switch to English a-x codes?",
     confirm_switch_chars_zh: "Switch back to Zhuyin codes as well?",
     btn_toggle_lang: "\u4e2d\u6587 / English",
-    page_title: "Letter Pairs Practice"
+    page_title: "3BLD(3 style & letter pairs) practice"
 });
 
 const SM2_SETTINGS = { defaultEf: 2.5, minEf: 1.3, intervals: [1, 3] };
@@ -252,6 +264,107 @@ function getFormulaDict(formulaType = 'corner') { return JSON.parse(localStorage
 function saveFormulaDict(formulaType = 'corner', dict) { localStorage.setItem(getContentStorageKey(formulaType), JSON.stringify(dict)); }
 function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : getDict(); }
 function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : saveDict(dict); }
+
+function isPlainObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function escapeCsvCell(value = '') {
+    const stringValue = String(value ?? '');
+    if (!/[",\n\r]/.test(stringValue)) return stringValue;
+    return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function sanitizeStringMap(value) {
+    if (!isPlainObject(value)) return {};
+    const next = {};
+    Object.entries(value).forEach(([key, mapValue]) => {
+        if (typeof key !== 'string' || typeof mapValue !== 'string') return;
+        next[key] = mapValue;
+    });
+    return next;
+}
+
+function sanitizeStatusMap(value) {
+    if (!isPlainObject(value)) return {};
+
+    const next = {};
+    const allowedColors = new Set(['green', 'yellow', 'red', 'gray']);
+
+    Object.entries(value).forEach(([key, statusValue]) => {
+        if (typeof key !== 'string') return;
+
+        if (typeof statusValue === 'string') {
+            if (allowedColors.has(statusValue)) next[key] = statusValue;
+            return;
+        }
+
+        if (!isPlainObject(statusValue)) return;
+
+        const color = allowedColors.has(statusValue.color) ? statusValue.color : 'red';
+        next[key] = {
+            interval: Number.isFinite(Number(statusValue.interval)) ? Number(statusValue.interval) : 0,
+            repetition: Number.isFinite(Number(statusValue.repetition)) ? Number(statusValue.repetition) : 0,
+            ef: Number.isFinite(Number(statusValue.ef)) ? Number(statusValue.ef) : SM2_SETTINGS.defaultEf,
+            dueDate: Number.isFinite(Number(statusValue.dueDate)) ? Number(statusValue.dueDate) : 0,
+            color
+        };
+    });
+
+    return next;
+}
+
+function sanitizeChars(value) {
+    if (!Array.isArray(value)) return null;
+
+    const next = value
+        .map((char) => typeof char === 'string' ? char.trim() : '')
+        .filter(Boolean);
+
+    if (next.length < 2) return null;
+    if (new Set(next).size !== next.length) return null;
+
+    return next;
+}
+
+function normalizeBackupPayload(value) {
+    if (!isPlainObject(value)) throw new Error('Invalid backup payload');
+
+    const knownKeys = [
+        'dict',
+        'formulaDict',
+        'cornerFormulaDict',
+        'edgeFormulaDict',
+        'status',
+        'formulaStatus',
+        'cornerFormulaStatus',
+        'edgeFormulaStatus',
+        'chars',
+        'lang'
+    ];
+    const hasKnownKey = knownKeys.some((key) => Object.prototype.hasOwnProperty.call(value, key));
+    if (!hasKnownKey) throw new Error('Unknown backup format');
+
+    const normalizedChars = value.chars == null ? null : sanitizeChars(value.chars);
+    if (value.chars != null && !normalizedChars) throw new Error('Invalid chars');
+
+    const normalizedLang = value.lang === 'zh-TW' || value.lang === 'en' ? value.lang : null;
+
+    return {
+        dict: sanitizeStringMap(value.dict),
+        cornerFormulaDict: sanitizeStringMap(value.cornerFormulaDict || value.formulaDict),
+        edgeFormulaDict: sanitizeStringMap(value.edgeFormulaDict),
+        status: sanitizeStatusMap(value.status),
+        cornerFormulaStatus: sanitizeStatusMap(value.cornerFormulaStatus || value.formulaStatus),
+        edgeFormulaStatus: sanitizeStatusMap(value.edgeFormulaStatus),
+        chars: normalizedChars,
+        lang: normalizedLang
+    };
+}
+
+function clearAppStorageData() {
+    APP_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+}
 
 function migrateLegacyFormulaData() {
     const hasCornerFormula = !!localStorage.getItem(CORNER_FORMULA_STORAGE_KEY);
@@ -552,6 +665,12 @@ function normalizeContentModes(contentModes = ['word']) {
 
 function getSelectedMemoryContentModes() {
     return normalizeContentModes(currentMemoryContentModes);
+}
+
+function getMemoryStatusTargetModes(contentModes = ['word']) {
+    const normalizedModes = normalizeContentModes(contentModes);
+    const algorithmModes = normalizedModes.filter(isAlgorithmContentMode);
+    return algorithmModes.length > 0 ? algorithmModes : normalizedModes;
 }
 
 function isMemoryContentModeActive(mode) {
@@ -1128,11 +1247,11 @@ function resetAllColors(targetColor = 'all') {
 function markMemStatus(gradeType) {
     if (!currentPair) return;
     let grade = gradeType === 'red' ? 1 : (gradeType === 'yellow' ? 3 : 5);
-    const selectedModes = getAvailablePairContentModes(
+    const selectedModes = getMemoryStatusTargetModes(getAvailablePairContentModes(
         currentPair,
         getSelectedMemoryContentModes(),
         { includePlaceholder: true }
-    );
+    ));
     if (selectedModes.length === 0) return;
     selectedModes.forEach((mode) => {
         const currentData = getPairData(currentPair, mode);
@@ -1333,17 +1452,15 @@ function exportData() {
 
     if (exportType === 'csv') {
         let csvContent = "\ufeff";
-        csvContent += "," + chars.join(",") + "\n";
+        csvContent += "," + chars.map(escapeCsvCell).join(",") + "\n";
         chars.forEach(rowChar => {
-            let row = [rowChar];
+            let row = [escapeCsvCell(rowChar)];
             chars.forEach(colChar => {
                 const pair = rowChar + colChar;
                 if (rowChar === colChar) {
                     row.push("");
                 } else {
-                    let val = dict[pair] || "";
-                    if (val.includes(",")) val = `"${val}"`;
-                    row.push(val);
+                    row.push(escapeCsvCell(dict[pair] || ""));
                 }
             });
             csvContent += row.join(",") + "\n";
@@ -1357,6 +1474,7 @@ function exportData() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
     } else {
         const statusMap = getStatusMap();
@@ -1396,13 +1514,15 @@ function exportData() {
             formulaStatus: cleanCornerFormulaStatus,
             cornerFormulaStatus: cleanCornerFormulaStatus,
             edgeFormulaStatus: cleanEdgeFormulaStatus,
-            chars: chars
+            chars: chars,
+            lang: currentLang
         })], { type: "application/json" });
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 }
 
@@ -1411,24 +1531,42 @@ function importData() {
     const f = fileInput.files[0];
     if (!f) return; const r = new FileReader(); r.onload = (e) => {
         try {
-            const d = JSON.parse(e.target.result);
-            const importedCornerFormulaDict = d.cornerFormulaDict || d.formulaDict || {};
-            const importedEdgeFormulaDict = d.edgeFormulaDict || {};
-            const importedCornerFormulaStatus = d.cornerFormulaStatus || d.formulaStatus || {};
-            const importedEdgeFormulaStatus = d.edgeFormulaStatus || {};
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(d.dict || {}));
-            localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(importedCornerFormulaDict));
-            localStorage.setItem(EDGE_FORMULA_STORAGE_KEY, JSON.stringify(importedEdgeFormulaDict));
-            localStorage.setItem(STATUS_KEY, JSON.stringify(d.status || {}));
-            localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(importedCornerFormulaStatus));
-            localStorage.setItem(EDGE_FORMULA_STATUS_KEY, JSON.stringify(importedEdgeFormulaStatus));
-            if (d.chars) { chars = d.chars; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); }
-            alert(t('alert_import_success')); initUI(); updateLayoutMode();
+            const parsedData = JSON.parse(e.target.result);
+            const normalizedData = normalizeBackupPayload(parsedData);
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData.dict));
+            localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.cornerFormulaDict));
+            localStorage.setItem(EDGE_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.edgeFormulaDict));
+            localStorage.setItem(STATUS_KEY, JSON.stringify(normalizedData.status));
+            localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(normalizedData.cornerFormulaStatus));
+            localStorage.setItem(EDGE_FORMULA_STATUS_KEY, JSON.stringify(normalizedData.edgeFormulaStatus));
+
+            if (normalizedData.chars) {
+                chars = normalizedData.chars;
+                localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+            }
+
+            if (normalizedData.lang) {
+                currentLang = normalizedData.lang;
+                localStorage.setItem(LANG_KEY, currentLang);
+            }
+
+            fileInput.value = '';
+            alert(t('alert_import_success'));
+            initUI();
+            applyLanguage();
+            updateLayoutMode();
             renderCurrentListView();
-        } catch (err) { alert(t('alert_import_error')); }
+        } catch (err) {
+            fileInput.value = '';
+            alert(t('alert_import_error'));
+        }
     };
     r.readAsText(f);
 }
 function clearAllData() {
-    if (confirm(t('alert_reset'))) { localStorage.clear(); location.reload(); }
+    if (confirm(t('alert_reset'))) {
+        clearAppStorageData();
+        location.reload();
+    }
 }
