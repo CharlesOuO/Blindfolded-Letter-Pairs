@@ -892,10 +892,48 @@ body {
 }
 
 .backup-group-label {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.settings-info-card,
+.settings-action-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+.settings-info-text,
+.settings-action-text {
+    margin: 0;
     color: #475569;
-    margin-bottom: 4px;
+    line-height: 1.6;
+}
+
+.settings-info-text a {
+    color: var(--primary-color);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.settings-info-text a:hover {
+    text-decoration: underline;
+}
+
+.settings-action-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.settings-lang-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 /* 匯出區塊 */
@@ -1224,6 +1262,15 @@ input:checked+.slider:before {
 
     .formula-grid {
         grid-template-columns: 1fr;
+    }
+
+    .settings-action-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .settings-lang-btn {
+        width: 100%;
     }
 
     .pair-item-formula {

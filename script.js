@@ -50,11 +50,11 @@ const savePairDataDebounced = debounce((pair, value, contentMode = 'word') => {
 
 const translations = {
     'zh-TW': {
-        nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "資料備份",
+        nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "設定",
         lbl_start_char: "開頭代碼：", btn_reset_color: "重置熟悉度：",
         lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題 (Space)", btn_start_test: "開始測驗 (Space)",
         btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter",
-        title_backup: "資料備份與還原", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料",
+        title_settings: "設定", title_backup: "備份", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料",
         opt_json: "系統備份檔 (.json)", opt_csv: "Excel 表格 (.csv)", btn_export_exec: "匯出資料",
         hint_matrix_edit: "提示：點擊表頭可修改代碼",
         btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "表格模式", btn_same: "同",
@@ -63,14 +63,19 @@ const translations = {
         hint_click_flip: "點擊卡片翻牌", fb_empty: "空白跳過", fb_wrong: "不熟", fb_slow: "猶豫", fb_good: "熟練",
         ans_prefix: "答案：", alert_no_data: "請先輸入資料！", alert_sel_range: "請選擇範圍", alert_import_success: "匯入成功", alert_import_error: "格式錯誤",
         lbl_start: "開頭：", lbl_end: "結尾：",
-        btn_hide: "隱藏", lbl_edit_mode: "編輯模式", btn_reset_all: "全部"
+        btn_hide: "隱藏", lbl_edit_mode: "編輯模式", btn_reset_all: "全部",
+        settings_formula_title: "公式預設",
+        settings_formula_prefix: "公式預設來源為 ",
+        settings_formula_suffix: "，預設使用 Speffz lettering scheme。",
+        settings_language_label: "Language",
+        settings_language_hint: "可在中文與 English 之間切換介面語言。"
     },
     'en': {
-        nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Backup",
+        nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Setting",
         lbl_start_char: "Start Code:", btn_reset_color: "Reset familiarity:",
         lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next (Space)", btn_start_test: "Start Test (Space)",
         btn_submit: "Submit (Enter)", ph_input: "Type & Enter",
-        title_backup: "Backup & Restore", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data",
+        title_settings: "Setting", title_backup: "Backup", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data",
         opt_json: "Backup File (.json)", opt_csv: "Excel Table (.csv)", btn_export_exec: "Export Data",
         hint_matrix_edit: "Click header to edit code",
         btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Table Mode", btn_same: "Same",
@@ -79,7 +84,12 @@ const translations = {
         hint_click_flip: "Click to flip", fb_empty: "Skipped", fb_wrong: "Hard", fb_slow: "Slow", fb_good: "Good",
         ans_prefix: "Ans: ", alert_no_data: "No data!", alert_sel_range: "Select range", alert_import_success: "Success", alert_import_error: "Error",
         lbl_start: "Start:", lbl_end: "End:",
-        btn_hide: "Hide", lbl_edit_mode: "Edit Mode", btn_reset_all: "All"
+        btn_hide: "Hide", lbl_edit_mode: "Edit Mode", btn_reset_all: "All",
+        settings_formula_title: "Formula Defaults",
+        settings_formula_prefix: "Default algorithms are sourced from ",
+        settings_formula_suffix: " and use the Speffz lettering scheme.",
+        settings_language_label: "Language",
+        settings_language_hint: "Switch the interface between English and Chinese."
     }
 };
 
@@ -208,13 +218,25 @@ function calculateNextReview(currentData, grade) {
 function getStatusMap(contentMode = 'word') {
     return JSON.parse(localStorage.getItem(getStatusStorageKey(contentMode))) || {};
 }
+function shouldDefaultHidePair(pair, contentMode = 'word') {
+    if (!isAlgorithmContentMode(contentMode)) return false;
+
+    const storedValue = (getContentDict(contentMode)[pair] || '').trim();
+    if (storedValue) return false;
+
+    return !getBuiltInAlgorithm(pair, contentMode);
+}
 function getPairData(pair, contentMode = 'word') {
     const map = getStatusMap(contentMode);
     let data = map[pair];
     if (typeof data === 'string') {
         return { interval: (data === 'green' ? 10 : 3), repetition: 1, ef: 2.5, dueDate: Date.now(), color: data };
     }
-    return data || null;
+    if (data) return data;
+    if (shouldDefaultHidePair(pair, contentMode)) {
+        return { interval: -1, repetition: 0, ef: 2.5, dueDate: 0, color: 'gray' };
+    }
+    return null;
 }
 function saveStatusData(pair, dataObject, contentMode = 'word') {
     const map = getStatusMap(contentMode);
@@ -559,6 +581,11 @@ function getPairIndices(pair) {
     return [-1, -1];
 }
 
+function isSameCharPair(pair) {
+    const [startIndex, endIndex] = getPairIndices(pair);
+    return startIndex !== -1 && startIndex === endIndex;
+}
+
 function getBuiltInAlgorithm(pair, contentMode = 'corner') {
     if (!isAlgorithmContentMode(contentMode)) return '';
 
@@ -581,16 +608,21 @@ function getPairContentValue(pair, contentMode, options = {}) {
     const storedValue = (dict[pair] || '').trim();
     if (storedValue) return storedValue;
 
-    if (options.includeBuiltIn !== false && isAlgorithmContentMode(contentMode)) {
-        return getBuiltInAlgorithm(pair, contentMode);
+    if (isAlgorithmContentMode(contentMode)) {
+        const builtInValue = options.includeBuiltIn === false ? '' : getBuiltInAlgorithm(pair, contentMode);
+        if (builtInValue) return builtInValue;
+
+        if (options.includePlaceholder && !isSameCharPair(pair)) {
+            return getAlgorithmPlaceholder(pair, contentMode);
+        }
     }
 
     return '';
 }
 
-function getAvailablePairContentModes(pair, contentModes = ['word']) {
+function getAvailablePairContentModes(pair, contentModes = ['word'], options = {}) {
     return normalizeContentModes(contentModes).filter((mode) => {
-        const value = getPairContentValue(pair, mode);
+        const value = getPairContentValue(pair, mode, options);
         if (!value) return false;
         const status = getPairData(pair, mode);
         return !(status && status.color === 'gray');
@@ -598,16 +630,17 @@ function getAvailablePairContentModes(pair, contentModes = ['word']) {
 }
 
 function formatMemoryAnswer(pair, contentModes = ['word']) {
-    const availableModes = getAvailablePairContentModes(pair, contentModes);
+    const answerOptions = { includePlaceholder: true };
+    const availableModes = getAvailablePairContentModes(pair, contentModes, answerOptions);
     if (availableModes.length === 0) return "N/A";
 
     if (availableModes.length === 1) {
-        return getPairContentValue(pair, availableModes[0]);
+        return getPairContentValue(pair, availableModes[0], answerOptions);
     }
 
     return availableModes.map((mode) => {
         const title = t(getContentLabelKey(mode));
-        const value = getPairContentValue(pair, mode);
+        const value = getPairContentValue(pair, mode, answerOptions);
         return `${title}: ${value}`;
     }).join('\n\n');
 }
@@ -671,12 +704,20 @@ function updateAlgorithmTypeButtons() {
 
 function toggleMemoryContentMode(mode) {
     const selectedModes = getSelectedMemoryContentModes();
-    if (selectedModes.includes(mode)) {
-        if (selectedModes.length === 1) return;
-        currentMemoryContentModes = selectedModes.filter((item) => item !== mode);
+    const isEdgeMode = mode === 'edge';
+    const hasEdgeMode = selectedModes.includes('edge');
+
+    if (isEdgeMode) {
+        currentMemoryContentModes = hasEdgeMode && selectedModes.length === 1 ? selectedModes : ['edge'];
+    } else if (selectedModes.includes(mode)) {
+        const nonEdgeModes = selectedModes.filter((item) => item !== 'edge');
+        if (nonEdgeModes.length === 1) return;
+        currentMemoryContentModes = nonEdgeModes.filter((item) => item !== mode);
     } else {
-        currentMemoryContentModes = [...selectedModes, mode];
+        const baseModes = hasEdgeMode ? [] : selectedModes.filter((item) => item !== 'edge');
+        currentMemoryContentModes = [...baseModes, mode];
     }
+
     updateMemoryContentModeButtons();
     nextMemoryCard();
 }
@@ -926,6 +967,9 @@ window.setMatrixStatus = function (statusType) {
         }
 
         saveStatusData(pair, newData, contentMode);
+        if (statusType === 'gray' && contentMode === 'word') {
+            saveStatusData(pair, newData, 'corner');
+        }
 
         // 更新畫面颜色
         const inputEl = document.querySelector(`.matrix-input[data-pair="${pair}"]`);
@@ -1084,7 +1128,11 @@ function resetAllColors(targetColor = 'all') {
 function markMemStatus(gradeType) {
     if (!currentPair) return;
     let grade = gradeType === 'red' ? 1 : (gradeType === 'yellow' ? 3 : 5);
-    const selectedModes = getAvailablePairContentModes(currentPair, getSelectedMemoryContentModes());
+    const selectedModes = getAvailablePairContentModes(
+        currentPair,
+        getSelectedMemoryContentModes(),
+        { includePlaceholder: true }
+    );
     if (selectedModes.length === 0) return;
     selectedModes.forEach((mode) => {
         const currentData = getPairData(currentPair, mode);
@@ -1111,6 +1159,7 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
     const startChars = getSelectedRanges(`${mode}_start`);
     const endChars = getSelectedRanges(`${mode}_end`);
     const normalizedModes = normalizeContentModes(contentModes);
+    const contentValueOptions = mode === 'mem' ? { includePlaceholder: true } : {};
     const requireAllModes = mode === 'mem' && normalizedModes.length > 1;
     const now = Date.now();
 
@@ -1124,7 +1173,7 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
             if (!endChars.includes(end)) return;
 
             const pair = start + end;
-            const availableModes = getAvailablePairContentModes(pair, normalizedModes);
+            const availableModes = getAvailablePairContentModes(pair, normalizedModes, contentValueOptions);
             if (availableModes.length === 0) return;
             if (requireAllModes && availableModes.length !== normalizedModes.length) return;
 
