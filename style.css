@@ -1199,7 +1199,7 @@ input:checked+.slider:before {
     }
 
     .nav-container {
-        justify-content: flex-start;
+        justify-content: center;
         padding: 0 12px;
     }
 
@@ -1903,6 +1903,28 @@ body::after {
     color: #334155;
 }
 
+#view-memory .control-panel,
+#view-test .control-panel {
+    position: relative;
+    z-index: 20;
+}
+
+#view-memory .flashcard-card,
+#view-test .card-area-test {
+    position: relative;
+    z-index: 1;
+}
+
+#view-memory .dropdown-wrapper,
+#view-test .dropdown-wrapper {
+    z-index: 1;
+}
+
+#view-memory .dropdown-wrapper.is-open,
+#view-test .dropdown-wrapper.is-open {
+    z-index: 30;
+}
+
 .dropdown-toggle-btn {
     width: 100%;
     justify-content: space-between;
@@ -2173,6 +2195,359 @@ body::after {
     .btn-export,
     .btn-import {
         max-width: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .container,
+    .container.wide-mode {
+        width: 100%;
+        padding: 0 14px;
+    }
+
+    .control-panel {
+        max-width: 100%;
+    }
+
+    .control-row {
+        flex-wrap: wrap;
+    }
+
+    .control-row > * {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .form-select {
+        width: min(100%, 320px);
+        min-width: min(100%, 240px);
+    }
+
+    .dropdown-content {
+        max-height: min(52vh, 360px);
+        overflow-y: auto;
+    }
+
+    .checkbox-grid {
+        grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    }
+
+    .backup-group-label {
+        font-size: clamp(1.35rem, 2.8vw, 1.6rem);
+    }
+}
+
+@media (max-width: 640px) {
+    :root {
+        --header-height: 58px;
+    }
+
+    .nav-bar {
+        height: var(--header-height);
+    }
+
+    .nav-container {
+        justify-content: center;
+        gap: 8px;
+        padding: 0 12px;
+        scroll-snap-type: x proximity;
+    }
+
+    .nav-btn {
+        min-height: 42px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        scroll-snap-align: start;
+    }
+
+    .container,
+    .container.wide-mode {
+        padding: 0 12px;
+        margin: 16px auto 28px;
+    }
+
+    .control-panel {
+        padding: 16px;
+        border-radius: 20px;
+    }
+
+    .list-controls-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .list-controls-row .action-btn {
+        width: 100%;
+        margin: 0;
+    }
+
+    #view-memory .memory-mode-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 10px;
+        width: 100%;
+    }
+
+    #view-memory .memory-mode-row .mode-choice-btn {
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .control-row,
+    .control-row-centered,
+    .matrix-settings-row,
+    .export-controls,
+    .import-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .control-row label,
+    .range-dropdown label {
+        white-space: normal;
+    }
+
+    .matrix-grade-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .matrix-grade-row .btn-grade {
+        width: 100%;
+        margin: 0;
+    }
+
+    .matrix-grade-offset {
+        margin-left: 0;
+    }
+
+    .toggle-switch-wrapper {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .range-dropdown,
+    .dropdown-wrapper {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .dropdown-content {
+        max-height: min(48vh, 340px);
+        border-radius: 16px;
+    }
+
+    .dropdown-toolbar {
+        gap: 8px;
+    }
+
+    .btn-flex {
+        min-height: 44px;
+    }
+
+    .checkbox-grid {
+        grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+        gap: 8px;
+    }
+
+    .checkbox-grid label,
+    .checkbox-chip {
+        padding: 8px 9px;
+    }
+
+    .card-area,
+    .card-area-test {
+        min-height: 320px;
+        padding: 20px 16px;
+        border-radius: 24px;
+    }
+
+    .flashcard-card {
+        margin: 16px auto;
+    }
+
+    .flashcard-stage,
+    .flashcard-3d {
+        min-height: 320px;
+    }
+
+    .flashcard-face {
+        padding: 20px 16px;
+        border-radius: 22px;
+    }
+
+    .question {
+        font-size: clamp(2.9rem, 19vw, 4.3rem);
+    }
+
+    .flashcard-subtext {
+        margin-top: 14px;
+        font-size: 0.95rem;
+        text-align: center;
+    }
+
+    .answer-text {
+        font-size: clamp(1.35rem, 6.6vw, 1.95rem);
+    }
+
+    .grading-btns {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .flashcard-back .grading-btns {
+        padding-top: 18px;
+    }
+
+    .grading-btn {
+        flex: 1 1 calc(33.333% - 10px);
+        min-width: 88px;
+        max-width: none;
+    }
+
+    #test-input {
+        min-height: 76px;
+        padding: 12px 14px;
+    }
+
+    .test-feedback,
+    .test-correct-msg-shell {
+        min-height: 24px;
+        font-size: 1rem;
+    }
+
+    .test-action-row {
+        margin: 16px 0 0;
+    }
+
+    .timer-badge {
+        margin-bottom: 12px;
+    }
+
+    .matrix-wrapper.formula-matrix-mode {
+        --cell-width: 116px;
+        --cell-height: 84px;
+    }
+
+    .settings-info-card,
+    .settings-action-card,
+    .import-card {
+        padding: 16px;
+        border-radius: 18px;
+    }
+
+    .settings-action-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .backup-container {
+        gap: 20px;
+    }
+
+    .backup-group-label {
+        text-align: left;
+    }
+
+    .btn-primary,
+    .btn-export,
+    .btn-import,
+    .settings-lang-btn {
+        width: 100%;
+        max-width: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .container,
+    .container.wide-mode {
+        padding: 0 10px;
+        margin: 14px auto 24px;
+    }
+
+    .control-panel {
+        padding: 14px;
+        border-radius: 18px;
+    }
+
+    .list-controls-row {
+        grid-template-columns: 1fr;
+    }
+
+    #view-memory .memory-mode-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dropdown-toggle-btn {
+        min-height: 50px;
+        padding-right: 38px;
+    }
+
+    .dropdown-toolbar {
+        flex-direction: column;
+    }
+
+    .card-area,
+    .card-area-test {
+        min-height: 300px;
+        padding: 18px 14px;
+    }
+
+    .flashcard-stage,
+    .flashcard-3d {
+        min-height: 300px;
+    }
+
+    .flashcard-face {
+        padding: 18px 14px;
+    }
+
+    .question {
+        font-size: clamp(2.6rem, 21vw, 3.8rem);
+        letter-spacing: -0.06em;
+    }
+
+    .answer-text {
+        font-size: clamp(1.2rem, 7vw, 1.72rem);
+    }
+
+    .grading-btn {
+        flex-basis: 100%;
+        min-width: 0;
+    }
+
+    .timer-badge {
+        font-size: 0.95rem;
+        padding: 8px 12px;
+    }
+
+    .grid-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .pair-item {
+        padding: 16px 14px;
+        border-radius: 18px;
+    }
+
+    .pair-label {
+        font-size: 1.7rem;
+    }
+
+    .backup-group-label {
+        font-size: 1.3rem;
+    }
+
+    .settings-info-card,
+    .settings-action-card,
+    .import-card {
+        padding: 14px;
+        border-radius: 16px;
     }
 }
 
