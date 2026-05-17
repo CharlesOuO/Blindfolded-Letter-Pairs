@@ -1818,6 +1818,250 @@ body::after {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
+.trainer-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.trainer-timer-display {
+    font-family: var(--display-font);
+    font-size: clamp(4.4rem, 11vw, 7rem);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.08em;
+    color: #0f172a;
+    text-align: center;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.trainer-timer-display.is-holding {
+    color: #d97706;
+    transform: scale(1.02);
+}
+
+.trainer-timer-display.is-ready {
+    color: #16a34a;
+    transform: scale(1.03);
+}
+
+.trainer-timer-display.is-running {
+    color: #0f172a;
+}
+
+.trainer-status {
+    min-height: 24px;
+    color: #475569;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.trainer-panel,
+.trainer-result-shell,
+.trainer-averages-shell,
+.trainer-history-shell {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 24px;
+    border: 1px solid rgba(191, 219, 254, 0.82);
+    background: rgba(248, 250, 252, 0.92);
+    text-align: left;
+}
+
+.trainer-panel-label {
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.trainer-scramble-text,
+.trainer-last-result {
+    margin-top: 10px;
+    color: #0f172a;
+    font-size: clamp(1.15rem, 2.35vw, 1.45rem);
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.trainer-feedback {
+    min-height: 24px;
+    color: #475569;
+    font-size: 0.94rem;
+    line-height: 1.45;
+}
+
+.trainer-last-result {
+    font-family: var(--display-font);
+    font-size: clamp(2.8rem, 6vw, 3.8rem);
+    line-height: 1.05;
+    letter-spacing: -0.06em;
+}
+
+.trainer-penalty-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.trainer-penalty-row .action-btn {
+    flex: 1 1 120px;
+}
+
+.trainer-result-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.trainer-result-shell .trainer-panel-label {
+    text-align: center;
+}
+
+.trainer-penalty-row-compact {
+    width: 100%;
+    margin-top: 0;
+    justify-content: center;
+}
+
+.trainer-action-btn {
+    flex: 0 1 auto;
+    min-width: 92px;
+    min-height: 40px;
+    margin: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+}
+
+.trainer-delete-btn.is-armed {
+    border-color: rgba(249, 115, 22, 0.7);
+    background: rgba(255, 247, 237, 0.95);
+    color: #c2410c;
+}
+
+.trainer-delete-confirm-btn {
+    border-color: rgba(220, 38, 38, 0.74);
+    background: linear-gradient(180deg, rgba(254, 242, 242, 0.98) 0%, rgba(254, 226, 226, 0.95) 100%);
+    color: #b91c1c;
+}
+
+.trainer-delete-confirm-btn:hover {
+    border-color: rgba(220, 38, 38, 0.88);
+    background: rgba(254, 226, 226, 0.98);
+    color: #991b1b;
+}
+
+.trainer-averages-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.trainer-average-card {
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.trainer-average-name {
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.trainer-average-value {
+    margin-top: 8px;
+    color: #0f172a;
+    font-family: var(--display-font);
+    font-size: clamp(1.4rem, 3.4vw, 2rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.05em;
+}
+
+.trainer-average-value.is-empty {
+    color: #94a3b8;
+}
+
+.trainer-average-value.is-dnf {
+    color: #dc2626;
+    font-size: clamp(1.2rem, 3vw, 1.7rem);
+    letter-spacing: 0;
+}
+
+.trainer-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.trainer-history-item {
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.trainer-history-item.is-latest {
+    border-color: rgba(96, 165, 250, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.82);
+}
+
+.trainer-history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.trainer-history-time {
+    color: #0f172a;
+    font-family: var(--display-font);
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+}
+
+.trainer-history-meta {
+    color: #64748b;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+.trainer-history-scramble,
+.trainer-history-empty {
+    color: #475569;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.trainer-toolbar {
+    align-items: flex-end;
+}
+
+.trainer-mode-group,
+.trainer-toolbar-actions {
+    display: flex;
+    gap: 10px;
+}
+
 #test-input {
     width: 100%;
     max-width: 460px;
@@ -1904,24 +2148,24 @@ body::after {
 }
 
 #view-memory .control-panel,
-#view-test .control-panel {
+#view-trainer .control-panel {
     position: relative;
     z-index: 20;
 }
 
 #view-memory .flashcard-card,
-#view-test .card-area-test {
+#view-trainer .card-area-test {
     position: relative;
     z-index: 1;
 }
 
 #view-memory .dropdown-wrapper,
-#view-test .dropdown-wrapper {
+#view-trainer .dropdown-wrapper {
     z-index: 1;
 }
 
 #view-memory .dropdown-wrapper.is-open,
-#view-test .dropdown-wrapper.is-open {
+#view-trainer .dropdown-wrapper.is-open {
     z-index: 30;
 }
 
@@ -2443,23 +2687,61 @@ body::after {
         min-height: 50px;
     }
 
-    #test-input {
-        min-height: 76px;
-        padding: 12px 14px;
+    .trainer-toolbar,
+    .trainer-mode-group {
+        flex-direction: column;
     }
 
-    .test-feedback,
-    .test-correct-msg-shell {
-        min-height: 24px;
-        font-size: 1rem;
-    }
-
-    .test-action-row {
-        margin: 16px 0 0;
+    .trainer-mode-group,
+    .trainer-toolbar-actions {
+        width: 100%;
     }
 
     .timer-badge {
         margin-bottom: 12px;
+    }
+
+    .trainer-panel,
+    .trainer-result-shell,
+    .trainer-averages-shell,
+    .trainer-history-shell {
+        padding: 16px 16px;
+        border-radius: 20px;
+    }
+
+    .trainer-averages-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .trainer-average-card {
+        padding: 12px 14px;
+        border-radius: 16px;
+    }
+
+    .trainer-scramble-text {
+        font-size: clamp(1.02rem, 4.5vw, 1.28rem);
+    }
+
+    .trainer-last-result {
+        font-size: clamp(2rem, 9vw, 2.7rem);
+    }
+
+    .trainer-timer-display {
+        font-size: clamp(3.2rem, 14vw, 5.2rem);
+    }
+
+    .trainer-action-btn {
+        flex: 1 1 96px;
+        min-width: 0;
+    }
+
+    .trainer-history-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .trainer-history-meta {
+        text-align: left;
     }
 
     .matrix-wrapper.formula-matrix-mode {

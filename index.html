@@ -236,7 +236,7 @@
         <div class="nav-container">
             <button class="nav-btn active" onclick="switchTab('list')" data-i18n="nav_list">列表輸入</button>
             <button class="nav-btn" onclick="switchTab('memory')" data-i18n="nav_mem">記憶翻牌</button>
-            <button class="nav-btn" onclick="switchTab('test')" data-i18n="nav_test">打字測驗</button>
+            <button class="nav-btn" onclick="switchTab('trainer')" data-i18n="nav_trainer">3-Style Trainer</button>
             <button class="nav-btn" onclick="switchTab('data')" data-i18n="nav_data">設定</button>
         </div>
     </div>
@@ -364,58 +364,109 @@
 
         </div>
 
-        <div id="view-test" class="view-section">
+        <div id="view-trainer" class="view-section">
             <div class="control-panel">
                 <div class="control-row control-row-wrap">
                     <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_start"
-                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">開頭：</label>
-                        <button id="test_start-btn" onclick="toggleDropdown('test_start')" class="action-btn dropdown-toggle-btn"
-                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                        <div class="dropdown-content" id="test_start-content">
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">Start:</label>
+                        <button id="trainer_start-btn" onclick="toggleDropdown('trainer_start')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">Select Range</button>
+                        <div class="dropdown-content" id="trainer_start-content">
                             <div class="dropdown-toolbar">
-                                <button class="btn-sm btn-flex" onclick="toggleAll('test_start', true)" style="flex:1;"
-                                    data-i18n="sel_full">全選</button>
-                                <button class="btn-sm btn-flex" onclick="toggleAll('test_start', false)" style="flex:1;"
-                                    data-i18n="sel_none">全消</button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_start', true)" style="flex:1;"
+                                    data-i18n="sel_full">ALL</button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_start', false)" style="flex:1;"
+                                    data-i18n="sel_none">NONE</button>
                             </div>
-                            <div id="test-start-range-grid" class="checkbox-grid"></div>
+                            <div id="trainer-start-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
 
                     <div class="dropdown-wrapper range-dropdown">
                         <label data-i18n="lbl_end"
-                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">結尾：</label>
-                        <button id="test_end-btn" onclick="toggleDropdown('test_end')" class="action-btn dropdown-toggle-btn"
-                            style="width:100%; justify-content:space-between; display:inline-flex;">選擇範圍 ▼</button>
-                        <div class="dropdown-content" id="test_end-content">
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;">End:</label>
+                        <button id="trainer_end-btn" onclick="toggleDropdown('trainer_end')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;">Select Range</button>
+                        <div class="dropdown-content" id="trainer_end-content">
                             <div class="dropdown-toolbar">
-                                <button class="btn-sm btn-flex" onclick="toggleAll('test_end', true)" style="flex:1;"
-                                    data-i18n="sel_full">全選</button>
-                                <button class="btn-sm btn-flex" onclick="toggleAll('test_end', false)" style="flex:1;"
-                                    data-i18n="sel_none">全消</button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_end', true)" style="flex:1;"
+                                    data-i18n="sel_full">ALL</button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_end', false)" style="flex:1;"
+                                    data-i18n="sel_none">NONE</button>
                             </div>
-                            <div id="test-end-range-grid" class="checkbox-grid"></div>
+                            <div id="trainer-end-range-grid" class="checkbox-grid"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="card-area-test">
-                <div id="timer" class="timer-badge">0.0s</div>
-                <div class="question" id="test-q">?</div>
-
-                <textarea id="test-input" data-i18n-placeholder="ph_input" placeholder="Type here"></textarea>
-
-                <div id="test-feedback" class="test-feedback">
+                <div class="control-row control-row-wrap trainer-toolbar">
+                    <div class="trainer-mode-group">
+                        <button id="btn-trainer-type-corner" class="action-btn" onclick="setTrainerAlgorithmType('corner')"
+                            data-i18n="algorithm_corners">Corners</button>
+                        <button id="btn-trainer-type-edge" class="action-btn" onclick="setTrainerAlgorithmType('edge')"
+                            data-i18n="algorithm_edges">Edges</button>
+                    </div>
+                    <div class="trainer-toolbar-actions">
+                        <button class="btn-primary" id="trainer-generate-btn" onclick="generateTrainerScramble()"
+                            data-i18n="btn_generate_scramble">Next Scramble</button>
+                    </div>
                 </div>
-                <div id="test-correct-msg" class="test-correct-msg-shell"></div>
             </div>
-            <div class="test-action-row">
-                <button class="btn-primary" id="test-btn" onclick="startTestQuestion()" data-i18n="btn_start_test">開始測驗
-                    (Space)</button>
+            <div class="card-area-test trainer-card">
+                <div id="trainer-type-badge" class="timer-badge">Corners</div>
+                <div id="trainer-timer" class="trainer-timer-display">0.00</div>
+                <div id="trainer-status" class="trainer-status" data-i18n="trainer_status_idle">Press Space to start</div>
+                <div class="trainer-panel">
+                    <div class="trainer-panel-label" data-i18n="trainer_scramble_label">Scramble</div>
+                    <div id="trainer-scramble" class="trainer-scramble-text"
+                        data-i18n="trainer_scramble_placeholder">Press Next Scramble to begin.</div>
+                </div>
+                <div id="trainer-feedback" class="trainer-feedback" data-i18n="trainer_scramble_hint">
+                    Scramble first, press Space to start, and press any key to stop.
+                </div>
+            </div>
+            <div id="trainer-result-shell" class="trainer-result-shell hidden">
+                <div class="trainer-panel-label" data-i18n="trainer_last_result_label">Last Solve</div>
+                <div id="trainer-last-result" class="trainer-last-result">0.00</div>
+                <div class="trainer-penalty-row trainer-penalty-row-compact">
+                    <button id="trainer-plus2-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('plus2')"
+                        data-i18n="btn_penalty_plus2">+2</button>
+                    <button id="trainer-dnf-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('dnf')"
+                        data-i18n="btn_penalty_dnf">DNF</button>
+                    <button id="trainer-delete-btn" class="action-btn trainer-action-btn trainer-delete-btn"
+                        onclick="toggleTrainerDeleteConfirm()"
+                        data-i18n="btn_delete_solve">Delete</button>
+                    <button id="trainer-delete-confirm-btn"
+                        class="action-btn trainer-action-btn trainer-delete-confirm-btn hidden"
+                        onclick="confirmDeleteLatestTrainerRecord()" data-i18n="btn_delete_confirm">Confirm</button>
+                </div>
+            </div>
+            <div class="trainer-averages-shell">
+                <div class="trainer-panel-label" data-i18n="trainer_averages_label">Averages</div>
+                <div class="trainer-averages-grid">
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao5</div>
+                        <div id="trainer-avg-5" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao12</div>
+                        <div id="trainer-avg-12" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao50</div>
+                        <div id="trainer-avg-50" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao100</div>
+                        <div id="trainer-avg-100" class="trainer-average-value is-empty">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="trainer-history-shell">
+                <div class="trainer-panel-label" data-i18n="trainer_history_label">History</div>
+                <div id="trainer-history" class="trainer-history-list"></div>
             </div>
         </div>
-
         <div id="view-data" class="view-section">
             <div class="control-panel">
                 <div class="backup-container">
