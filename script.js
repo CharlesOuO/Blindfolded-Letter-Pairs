@@ -50,6 +50,10 @@ let currentTrainerStatusKey = 'trainer_status_idle';
 let trainerDeleteConfirmArmed = false;
 let expandedTrainerRecordId = null;
 let trainerHistoryDeleteConfirmRecordId = null;
+let trainerScrambleNavigation = {
+    corner: { items: [], index: -1 },
+    edge: { items: [], index: -1 }
+};
 let currentTab = 'list';
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
 const MEMORY_REPEAT_GAP = 5;
@@ -57,6 +61,7 @@ const TAB_ORDER = ['list', 'memory', 'trainer', 'data'];
 const TRAINER_RECORDS_LIMIT = 200;
 const TRAINER_HISTORY_PREVIEW_LIMIT = 8;
 const TRAINER_AVERAGE_COUNTS = [5, 12, 50, 100];
+const TRAINER_SCRAMBLE_HISTORY_LIMIT = 200;
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -165,6 +170,7 @@ Object.assign(translations['zh-TW'], {
     trainer_status_delete_confirm: "\u518d\u6309\u4e00\u6b21\u300c\u78ba\u8a8d\u300d\u624d\u6703\u522a\u9664\u6700\u8fd1\u4e00\u6b21\u6210\u7e3e\u3002",
     trainer_status_no_scramble: "\u76ee\u524d\u7bc4\u570d\u6c92\u6709\u53ef\u7528\u7684 scramble\u3002",
     btn_generate_scramble: "\u7522\u751f\u4e0b\u4e00\u7d44 Scramble",
+    btn_prev_scramble: "\u4e0a\u4e00\u7d44 Scramble",
     btn_penalty_plus2: "+2",
     btn_penalty_dnf: "DNF",
     btn_delete_solve: "\u522a\u9664",
@@ -224,6 +230,7 @@ Object.assign(translations.en, {
     trainer_status_delete_confirm: "Press Confirm again to delete the latest solve.",
     trainer_status_no_scramble: "No available scramble in this range.",
     btn_generate_scramble: "Next Scramble",
+    btn_prev_scramble: "Previous Scramble",
     btn_penalty_plus2: "+2",
     btn_penalty_dnf: "DNF",
     btn_delete_solve: "Delete",
@@ -481,6 +488,14 @@ function syncLatestTrainerRecordId() {
     return latestTrainerRecordId;
 }
 
+function resetTrainerScrambleNavigation() {
+    trainerScrambleNavigation = {
+        corner: { items: [], index: -1 },
+        edge: { items: [], index: -1 }
+    };
+    updateTrainerScrambleNavButtons();
+}
+
 function saveTrainerRecords(records) {
     trainerRecords = records.slice(0, TRAINER_RECORDS_LIMIT);
     syncLatestTrainerRecordId();
@@ -514,6 +529,7 @@ function init() {
     if (savedChars) chars = JSON.parse(savedChars);
     trainerRecords = getTrainerRecords();
     syncLatestTrainerRecordId();
+    resetTrainerScrambleNavigation();
     migrateLegacyFormulaData();
     currentTab = document.querySelector('.view-section.active')?.id?.replace('view-', '') || 'list';
     initUI(); setupDynamicUI(); enhanceMemoryCardLayout(); applyLanguage(); updateLayoutMode();
@@ -555,6 +571,15 @@ function setupEventListeners() {
         const activeTab = document.querySelector('.view-section.active')?.id;
         if (activeTab === 'view-trainer') handleTrainerKeyUp(e);
     });
+
+    const trainerTimerEl = document.getElementById('trainer-timer');
+    if (trainerTimerEl) {
+        trainerTimerEl.addEventListener('click', handleTrainerTimerTap);
+    }
+    const trainerCardEl = document.querySelector('#view-trainer .trainer-card');
+    if (trainerCardEl) {
+        trainerCardEl.addEventListener('click', handleTrainerCardTap);
+    }
 
     const listContainer = document.getElementById('grid-area');
     listContainer.addEventListener('input', (e) => {
@@ -1228,12 +1253,11 @@ function toggleMemoryContentMode(mode) {
 
 function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
-    trainerDeleteConfirmArmed = false;
-    trainerHistoryDeleteConfirmRecordId = null;
-    expandedTrainerRecordId = null;
+    clearTrainerInlineStates();
     updateTrainerAlgorithmButtons();
     updateTrainerTypeBadge();
     renderTrainerRecords();
+    updateTrainerScrambleNavButtons();
     generateTrainerScramble({ silent: true, resetTimerDisplay: true });
 }
 
@@ -1301,6 +1325,102 @@ function chooseTrainerPairFromPool(pool) {
         if (filteredPool.length > 0) nextPool = filteredPool;
     }
     return nextPool[Math.floor(Math.random() * nextPool.length)];
+}
+
+function getTrainerScrambleNavState(type = currentTrainerAlgorithmType) {
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerScrambleNavigation[algorithmType]) {
+        trainerScrambleNavigation[algorithmType] = { items: [], index: -1 };
+    }
+    return trainerScrambleNavigation[algorithmType];
+}
+
+function updateTrainerScrambleNavButtons() {
+    const prevBtn = document.getElementById('trainer-prev-btn');
+    if (!prevBtn) return;
+
+    const navState = getTrainerScrambleNavState();
+    prevBtn.disabled = navState.index <= 0;
+}
+
+function setTrainerScrambleDisplay(scramble = '') {
+    const scrambleEl = document.getElementById('trainer-scramble');
+    if (!scrambleEl) return;
+    scrambleEl.innerText = scramble || t('trainer_scramble_placeholder');
+}
+
+function applyTrainerScrambleSnapshot(snapshot, options = {}) {
+    if (!snapshot || !snapshot.scramble) return false;
+
+    currentTrainerPair = snapshot.pair || null;
+    currentTrainerScramble = snapshot.scramble;
+    lastTrainerPair = snapshot.pair || null;
+
+    setTrainerScrambleDisplay(currentTrainerScramble);
+    const feedbackEl = document.getElementById('trainer-feedback');
+    if (feedbackEl) feedbackEl.innerText = t('trainer_scramble_hint');
+
+    if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
+    updateTrainerScrambleNavButtons();
+    return true;
+}
+
+function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAlgorithmType) {
+    if (!pair || !scramble) return;
+
+    const navState = getTrainerScrambleNavState(type);
+    if (navState.index < navState.items.length - 1) {
+        navState.items = navState.items.slice(0, navState.index + 1);
+    }
+
+    navState.items.push({
+        pair,
+        scramble,
+        algorithmType: normalizeTrainerAlgorithmType(type)
+    });
+
+    if (navState.items.length > TRAINER_SCRAMBLE_HISTORY_LIMIT) {
+        navState.items.shift();
+    }
+
+    navState.index = navState.items.length - 1;
+    updateTrainerScrambleNavButtons();
+}
+
+function clearTrainerInlineStates() {
+    trainerDeleteConfirmArmed = false;
+    trainerHistoryDeleteConfirmRecordId = null;
+    expandedTrainerRecordId = null;
+    updateTrainerDeleteButtons();
+}
+
+function goToPreviousTrainerScramble() {
+    if (trainerTimerState === 'running') return;
+
+    const navState = getTrainerScrambleNavState();
+    if (navState.index <= 0) return;
+
+    clearTrainerInlineStates();
+    resetTrainerTimerState({ keepStatus: true, resetTimerDisplay: true });
+
+    navState.index -= 1;
+    applyTrainerScrambleSnapshot(navState.items[navState.index]);
+}
+
+function goToNextTrainerScramble() {
+    if (trainerTimerState === 'running') return;
+
+    const navState = getTrainerScrambleNavState();
+    if (navState.index < navState.items.length - 1) {
+        clearTrainerInlineStates();
+        resetTrainerTimerState({ keepStatus: true, resetTimerDisplay: true });
+
+        navState.index += 1;
+        applyTrainerScrambleSnapshot(navState.items[navState.index]);
+        return;
+    }
+
+    generateTrainerScramble();
 }
 
 function isOuterFaceBase(base = '') {
@@ -1660,6 +1780,7 @@ function renderTrainerRecords() {
         }
     }
 
+    updateTrainerScrambleNavButtons();
     renderTrainerAverages();
 
     if (trainerTimerState === 'idle') syncTrainerTimerToLatestRecord();
@@ -1794,6 +1915,42 @@ function handleTrainerKeyUp(event) {
     return false;
 }
 
+function handleTrainerTimerTap(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const activeTab = document.querySelector('.view-section.active')?.id;
+    if (activeTab !== 'view-trainer') return false;
+
+    if (trainerTimerState === 'running') {
+        stopTrainerTimer();
+        return true;
+    }
+
+    if (trainerTimerState !== 'idle') return false;
+
+    if (!currentTrainerScramble) {
+        generateTrainerScramble();
+        return true;
+    }
+
+    startTrainerTimer();
+    return true;
+}
+
+function handleTrainerCardTap(event) {
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!targetEl) return false;
+
+    if (targetEl.closest('.trainer-panel')) return false;
+    if (targetEl.closest('#trainer-penalty-shell')) return false;
+    if (targetEl.closest('button, a, input, textarea, select, label')) return false;
+
+    return handleTrainerTimerTap(event);
+}
+
 function resetTrainerView(options = {}) {
     stopTrainerHold();
     stopTrainerAnimation();
@@ -1801,9 +1958,8 @@ function resetTrainerView(options = {}) {
     currentTrainerPair = null;
     currentTrainerScramble = '';
 
-    const scrambleEl = document.getElementById('trainer-scramble');
     const feedbackEl = document.getElementById('trainer-feedback');
-    if (scrambleEl) scrambleEl.innerText = t('trainer_scramble_placeholder');
+    setTrainerScrambleDisplay('');
     if (feedbackEl) feedbackEl.innerText = t('trainer_scramble_hint');
 
     if (options.showNoScramble) {
@@ -1812,14 +1968,12 @@ function resetTrainerView(options = {}) {
         setTrainerStatus('trainer_status_idle');
     }
     if (options.resetTimerDisplay !== false) syncTrainerTimerToLatestRecord();
+    updateTrainerScrambleNavButtons();
 }
 
 function generateTrainerScramble(options = {}) {
     if (trainerTimerState === 'running') return;
-    if (trainerDeleteConfirmArmed) {
-        trainerDeleteConfirmArmed = false;
-        updateTrainerDeleteButtons();
-    }
+    clearTrainerInlineStates();
 
     resetTrainerTimerState({
         keepStatus: true,
@@ -1861,13 +2015,12 @@ function generateTrainerScramble(options = {}) {
         return;
     }
 
-    currentTrainerPair = pair;
-    currentTrainerScramble = scrambleMoves.join(' ');
-    lastTrainerPair = pair;
-
-    document.getElementById('trainer-scramble').innerText = currentTrainerScramble;
-    document.getElementById('trainer-feedback').innerText = t('trainer_scramble_hint');
-    if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
+    const nextScramble = scrambleMoves.join(' ');
+    rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType);
+    const navState = getTrainerScrambleNavState();
+    applyTrainerScrambleSnapshot(navState.items[navState.index], {
+        preserveStatus: options.preserveStatus === true
+    });
 }
 
 function toggleViewMode(mode) {
@@ -2590,6 +2743,7 @@ function importData() {
             trainerDeleteConfirmArmed = false;
             expandedTrainerRecordId = null;
             trainerHistoryDeleteConfirmRecordId = null;
+            resetTrainerScrambleNavigation();
 
             if (normalizedData.chars) {
                 chars = normalizedData.chars;

@@ -1429,6 +1429,15 @@ body::after {
     box-shadow: none;
 }
 
+.action-btn:disabled,
+.action-btn:disabled:hover {
+    border-color: rgba(226, 232, 240, 0.96);
+    background: #f8fafc;
+    color: #94a3b8;
+    transform: none;
+    cursor: not-allowed;
+}
+
 .btn-primary {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-strong) 100%);
     box-shadow: none;
@@ -1825,6 +1834,12 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    cursor: pointer;
+}
+
+#view-trainer .trainer-card .trainer-panel,
+#view-trainer .trainer-card #trainer-penalty-shell {
+    cursor: default;
 }
 
 #view-trainer .trainer-averages-shell,
@@ -1846,6 +1861,10 @@ body::after {
     letter-spacing: -0.08em;
     color: #0f172a;
     text-align: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
     transition: color 0.18s ease, transform 0.18s ease;
 }
 
@@ -2105,13 +2124,31 @@ body::after {
 }
 
 .trainer-toolbar {
-    align-items: flex-end;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+#view-trainer .control-panel .action-btn {
+    margin: 0;
 }
 
 .trainer-mode-group,
 .trainer-toolbar-actions {
     display: flex;
     gap: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.trainer-mode-group .action-btn,
+.trainer-toolbar-actions .action-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+    min-height: 46px;
+    white-space: nowrap;
 }
 
 #test-input {
