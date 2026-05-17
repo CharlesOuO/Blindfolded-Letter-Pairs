@@ -1811,7 +1811,7 @@ body::after {
     margin-bottom: 16px;
     padding: 10px 16px;
     border-radius: 999px;
-    border: 1px solid rgba(191, 219, 254, 0.7);
+    border: 1px solid rgba(226, 232, 240, 0.96);
     background: #ffffff;
     color: #475569;
     font-family: var(--display-font);
@@ -1832,6 +1832,10 @@ body::after {
     margin-left: auto;
     margin-right: auto;
     max-width: var(--content-max-width);
+}
+
+#view-trainer .trainer-history-shell {
+    margin-top: 20px;
 }
 
 .trainer-timer-display {
@@ -1873,7 +1877,7 @@ body::after {
     width: 100%;
     padding: 16px 18px;
     border-radius: 24px;
-    border: 1px solid rgba(191, 219, 254, 0.82);
+    border: 1px solid rgba(226, 232, 240, 0.96);
     background: #ffffff;
     text-align: left;
 }
@@ -2009,11 +2013,21 @@ body::after {
     border-radius: 18px;
     border: 1px solid rgba(226, 232, 240, 0.96);
     background: #ffffff;
+    cursor: pointer;
 }
 
 .trainer-history-item.is-latest {
-    border-color: rgba(96, 165, 250, 0.72);
+    border-color: rgba(226, 232, 240, 0.96);
     box-shadow: none;
+}
+
+.trainer-history-item:focus-visible {
+    outline: 2px solid rgba(96, 165, 250, 0.55);
+    outline-offset: 2px;
+}
+
+.trainer-history-item.is-expanded {
+    padding-bottom: 14px;
 }
 
 .trainer-history-head {
@@ -2036,6 +2050,49 @@ body::after {
     font-size: 0.84rem;
     font-weight: 600;
     text-align: right;
+}
+
+.trainer-history-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(226, 232, 240, 0.96);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.trainer-history-detail-label {
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.trainer-history-detail-value {
+    color: #0f172a;
+    font-size: 0.93rem;
+    font-weight: 600;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.trainer-history-action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.trainer-history-action-btn {
+    flex: 1 1 86px;
+    min-width: 0;
+    min-height: 38px;
+    margin: 0;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
 }
 
 .trainer-history-scramble,

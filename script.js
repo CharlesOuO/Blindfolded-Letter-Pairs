@@ -48,6 +48,8 @@ let trainerAnimationFrameId = null;
 let trainerStartTimestamp = 0;
 let currentTrainerStatusKey = 'trainer_status_idle';
 let trainerDeleteConfirmArmed = false;
+let expandedTrainerRecordId = null;
+let trainerHistoryDeleteConfirmRecordId = null;
 let currentTab = 'list';
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
 const MEMORY_REPEAT_GAP = 5;
@@ -171,6 +173,7 @@ Object.assign(translations['zh-TW'], {
     trainer_last_result_label: "\u6700\u8fd1\u4e00\u6b21",
     trainer_averages_label: "\u5e73\u5747",
     trainer_history_label: "\u7d00\u9304",
+    trainer_solution_label: "\u89e3\u6cd5",
     trainer_history_empty: "\u9084\u6c92\u6709\u8a08\u6642\u7d00\u9304",
     alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210 scramble\u3002",
     btn_toggle_lang: "English / \u4e2d\u6587",
@@ -229,6 +232,7 @@ Object.assign(translations.en, {
     trainer_last_result_label: "Last Solve",
     trainer_averages_label: "Averages",
     trainer_history_label: "History",
+    trainer_solution_label: "Solution",
     trainer_history_empty: "No solves yet.",
     alert_invalid_algorithm_format: "This algorithm format cannot be converted into a scramble yet.",
     btn_toggle_lang: "\u4e2d\u6587 / English",
@@ -459,10 +463,34 @@ function getTrainerRecords() {
     }
 }
 
+function normalizeTrainerAlgorithmType(type = 'corner') {
+    return type === 'edge' ? 'edge' : 'corner';
+}
+
+function getTrainerSessionRecords(type = currentTrainerAlgorithmType) {
+    const sessionType = normalizeTrainerAlgorithmType(type);
+    return trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) === sessionType);
+}
+
+function getLatestTrainerSessionRecord(type = currentTrainerAlgorithmType) {
+    return getTrainerSessionRecords(type)[0] || null;
+}
+
+function syncLatestTrainerRecordId() {
+    latestTrainerRecordId = getLatestTrainerSessionRecord()?.id || null;
+    return latestTrainerRecordId;
+}
+
 function saveTrainerRecords(records) {
     trainerRecords = records.slice(0, TRAINER_RECORDS_LIMIT);
-    latestTrainerRecordId = trainerRecords[0]?.id || null;
+    syncLatestTrainerRecordId();
     trainerDeleteConfirmArmed = false;
+    if (expandedTrainerRecordId && !trainerRecords.some((record) => record.id === expandedTrainerRecordId)) {
+        expandedTrainerRecordId = null;
+    }
+    if (trainerHistoryDeleteConfirmRecordId && !trainerRecords.some((record) => record.id === trainerHistoryDeleteConfirmRecordId)) {
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
     localStorage.setItem(TRAINER_RECORDS_KEY, JSON.stringify(trainerRecords));
     renderTrainerRecords();
 }
@@ -485,7 +513,7 @@ function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
     trainerRecords = getTrainerRecords();
-    latestTrainerRecordId = trainerRecords[0]?.id || null;
+    syncLatestTrainerRecordId();
     migrateLegacyFormulaData();
     currentTab = document.querySelector('.view-section.active')?.id?.replace('view-', '') || 'list';
     initUI(); setupDynamicUI(); enhanceMemoryCardLayout(); applyLanguage(); updateLayoutMode();
@@ -497,7 +525,22 @@ function init() {
 }
 
 function setupEventListeners() {
-    document.addEventListener('click', function (e) { if (!e.target.closest('.dropdown-wrapper')) { closeAllDropdowns(); } });
+    document.addEventListener('click', function (e) {
+        const targetEl = e.target instanceof Element ? e.target : null;
+
+        if (!targetEl || !targetEl.closest('.dropdown-wrapper')) {
+            closeAllDropdowns();
+        }
+
+        const activeTab = document.querySelector('.view-section.active')?.id;
+        if (activeTab !== 'view-trainer') return;
+        if (!expandedTrainerRecordId) return;
+        if (targetEl && targetEl.closest('#trainer-history .trainer-history-item')) return;
+
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+        renderTrainerRecords();
+    });
 
     document.addEventListener('keydown', function (e) {
         const activeTab = document.querySelector('.view-section.active')?.id;
@@ -1186,8 +1229,11 @@ function toggleMemoryContentMode(mode) {
 function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
     trainerDeleteConfirmArmed = false;
+    trainerHistoryDeleteConfirmRecordId = null;
+    expandedTrainerRecordId = null;
     updateTrainerAlgorithmButtons();
     updateTrainerTypeBadge();
+    renderTrainerRecords();
     generateTrainerScramble({ silent: true, resetTimerDisplay: true });
 }
 
@@ -1357,7 +1403,7 @@ function getTrainerRecordFinalTime(record) {
 }
 
 function calculateTrainerAverage(count) {
-    const recentRecords = trainerRecords.slice(0, count);
+    const recentRecords = getTrainerSessionRecords().slice(0, count);
     if (recentRecords.length < count) return null;
 
     const trimCount = Math.ceil(count * 0.05);
@@ -1413,7 +1459,7 @@ function updateTrainerTimerVisualState() {
 }
 
 function syncTrainerTimerToLatestRecord() {
-    setTrainerTimerDisplay(getTrainerDisplayTime(trainerRecords[0] || null));
+    setTrainerTimerDisplay(getTrainerDisplayTime(getLatestTrainerSessionRecord()));
     updateTrainerTimerVisualState();
 }
 
@@ -1427,10 +1473,62 @@ function updateTrainerDeleteButtons() {
     confirmBtn.classList.toggle('hidden', !trainerDeleteConfirmArmed);
 }
 
+function toggleTrainerRecordExpanded(recordId) {
+    if (!recordId) return;
+
+    trainerDeleteConfirmArmed = false;
+    updateTrainerDeleteButtons();
+
+    if (expandedTrainerRecordId === recordId) {
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+    } else {
+        expandedTrainerRecordId = recordId;
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
+
+    renderTrainerRecords();
+}
+
+function resolveTrainerRecordActionTarget(recordId = null) {
+    if (recordId) {
+        const targetRecord = trainerRecords.find((record) => record.id === recordId);
+        return targetRecord?.id || null;
+    }
+
+    return syncLatestTrainerRecordId();
+}
+
+function toggleTrainerHistoryDeleteConfirm(recordId) {
+    if (!recordId) return;
+
+    trainerDeleteConfirmArmed = false;
+    updateTrainerDeleteButtons();
+    trainerHistoryDeleteConfirmRecordId = trainerHistoryDeleteConfirmRecordId === recordId ? null : recordId;
+    renderTrainerRecords();
+}
+
+function confirmDeleteTrainerRecord(recordId) {
+    const targetRecordId = resolveTrainerRecordActionTarget(recordId);
+    if (!targetRecordId) return;
+
+    trainerHistoryDeleteConfirmRecordId = null;
+    if (expandedTrainerRecordId === targetRecordId) expandedTrainerRecordId = null;
+    saveTrainerRecords(trainerRecords.filter((record) => record.id !== targetRecordId));
+    setTrainerStatus(currentTrainerScramble ? 'trainer_status_idle' : 'trainer_status_no_scramble');
+}
+
 function renderTrainerRecords() {
-    const latestRecord = trainerRecords[0] || null;
+    const sessionRecords = getTrainerSessionRecords();
+    const latestRecord = sessionRecords[0] || null;
+    latestTrainerRecordId = latestRecord?.id || null;
     const penaltyShellEl = document.getElementById('trainer-penalty-shell');
     const historyEl = document.getElementById('trainer-history');
+
+    if (expandedTrainerRecordId && !sessionRecords.some((record) => record.id === expandedTrainerRecordId)) {
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
 
     if (penaltyShellEl) penaltyShellEl.classList.toggle('hidden', !latestRecord);
 
@@ -1448,9 +1546,14 @@ function renderTrainerRecords() {
             historyEl.appendChild(emptyEl);
         } else {
             const fragment = document.createDocumentFragment();
-            trainerRecords.slice(0, TRAINER_HISTORY_PREVIEW_LIMIT).forEach((record, index) => {
+            sessionRecords.slice(0, TRAINER_HISTORY_PREVIEW_LIMIT).forEach((record, index) => {
+                const isExpanded = record.id === expandedTrainerRecordId;
                 const itemEl = document.createElement('div');
-                itemEl.className = `trainer-history-item${index === 0 ? ' is-latest' : ''}`;
+                itemEl.className = `trainer-history-item${index === 0 ? ' is-latest' : ''}${isExpanded ? ' is-expanded' : ''}`;
+                itemEl.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    toggleTrainerRecordExpanded(record.id);
+                });
 
                 const headEl = document.createElement('div');
                 headEl.className = 'trainer-history-head';
@@ -1472,6 +1575,85 @@ function renderTrainerRecords() {
                 headEl.appendChild(timeEl);
                 headEl.appendChild(metaEl);
                 itemEl.appendChild(headEl);
+
+                if (isExpanded) {
+                    const algorithmText = getTrainerRecordAlgorithmText(record);
+                    const isDeleteConfirming = trainerHistoryDeleteConfirmRecordId === record.id;
+
+                    const detailsEl = document.createElement('div');
+                    detailsEl.className = 'trainer-history-details';
+
+                    const scrambleLabelEl = document.createElement('div');
+                    scrambleLabelEl.className = 'trainer-history-detail-label';
+                    scrambleLabelEl.innerText = t('trainer_scramble_label');
+
+                    const scrambleValueEl = document.createElement('div');
+                    scrambleValueEl.className = 'trainer-history-detail-value';
+                    scrambleValueEl.innerText = record.scramble || '--';
+
+                    const solutionLabelEl = document.createElement('div');
+                    solutionLabelEl.className = 'trainer-history-detail-label';
+                    solutionLabelEl.innerText = t('trainer_solution_label');
+
+                    const solutionValueEl = document.createElement('div');
+                    solutionValueEl.className = 'trainer-history-detail-value';
+                    solutionValueEl.innerText = algorithmText || '--';
+
+                    const actionRowEl = document.createElement('div');
+                    actionRowEl.className = 'trainer-history-action-row';
+
+                    const plus2Btn = document.createElement('button');
+                    plus2Btn.type = 'button';
+                    plus2Btn.className = 'action-btn trainer-history-action-btn';
+                    plus2Btn.innerText = t('btn_penalty_plus2');
+                    setActionButtonActive(plus2Btn, record.penalty === 'plus2');
+                    plus2Btn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerPenalty('plus2', record.id);
+                    });
+
+                    const dnfBtn = document.createElement('button');
+                    dnfBtn.type = 'button';
+                    dnfBtn.className = 'action-btn trainer-history-action-btn';
+                    dnfBtn.innerText = t('btn_penalty_dnf');
+                    setActionButtonActive(dnfBtn, record.penalty === 'dnf');
+                    dnfBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerPenalty('dnf', record.id);
+                    });
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'action-btn trainer-history-action-btn trainer-delete-btn';
+                    deleteBtn.innerText = t(isDeleteConfirming ? 'btn_delete_cancel' : 'btn_delete_solve');
+                    deleteBtn.classList.toggle('is-armed', isDeleteConfirming);
+                    deleteBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerHistoryDeleteConfirm(record.id);
+                    });
+
+                    const confirmBtn = document.createElement('button');
+                    confirmBtn.type = 'button';
+                    confirmBtn.className = `action-btn trainer-history-action-btn trainer-delete-confirm-btn${isDeleteConfirming ? '' : ' hidden'}`;
+                    confirmBtn.innerText = t('btn_delete_confirm');
+                    confirmBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        confirmDeleteTrainerRecord(record.id);
+                    });
+
+                    actionRowEl.appendChild(plus2Btn);
+                    actionRowEl.appendChild(dnfBtn);
+                    actionRowEl.appendChild(deleteBtn);
+                    actionRowEl.appendChild(confirmBtn);
+
+                    detailsEl.appendChild(scrambleLabelEl);
+                    detailsEl.appendChild(scrambleValueEl);
+                    detailsEl.appendChild(solutionLabelEl);
+                    detailsEl.appendChild(solutionValueEl);
+                    detailsEl.appendChild(actionRowEl);
+                    itemEl.appendChild(detailsEl);
+                }
+
                 fragment.appendChild(itemEl);
             });
             historyEl.appendChild(fragment);
@@ -1551,11 +1733,13 @@ function stopTrainerTimer() {
     generateTrainerScramble({ silent: true, preserveStatus: true });
 }
 
-function toggleTrainerPenalty(penalty) {
-    if (!latestTrainerRecordId) return;
+function toggleTrainerPenalty(penalty, recordId = null) {
+    const targetRecordId = resolveTrainerRecordActionTarget(recordId);
+    if (!targetRecordId) return;
 
+    trainerHistoryDeleteConfirmRecordId = null;
     const nextRecords = trainerRecords.map((record) => {
-        if (record.id !== latestTrainerRecordId) return record;
+        if (record.id !== targetRecordId) return record;
         return {
             ...record,
             penalty: record.penalty === penalty ? 'ok' : penalty
@@ -1567,16 +1751,15 @@ function toggleTrainerPenalty(penalty) {
 }
 
 function toggleTrainerDeleteConfirm() {
-    if (!latestTrainerRecordId) return;
+    if (!syncLatestTrainerRecordId()) return;
     trainerDeleteConfirmArmed = !trainerDeleteConfirmArmed;
+    trainerHistoryDeleteConfirmRecordId = null;
     updateTrainerDeleteButtons();
     setTrainerStatus(trainerDeleteConfirmArmed ? 'trainer_status_delete_confirm' : 'trainer_status_stopped');
 }
 
 function confirmDeleteLatestTrainerRecord() {
-    if (!latestTrainerRecordId) return;
-    saveTrainerRecords(trainerRecords.filter((record) => record.id !== latestTrainerRecordId));
-    setTrainerStatus(currentTrainerScramble ? 'trainer_status_idle' : 'trainer_status_no_scramble');
+    confirmDeleteTrainerRecord(syncLatestTrainerRecordId());
 }
 
 function handleTrainerKeyDown(event) {
@@ -2403,7 +2586,10 @@ function importData() {
             localStorage.setItem(EDGE_FORMULA_STATUS_KEY, JSON.stringify(normalizedData.edgeFormulaStatus));
             localStorage.setItem(TRAINER_RECORDS_KEY, JSON.stringify(normalizedData.trainerRecords));
             trainerRecords = normalizedData.trainerRecords;
-            latestTrainerRecordId = trainerRecords[0]?.id || null;
+            syncLatestTrainerRecordId();
+            trainerDeleteConfirmArmed = false;
+            expandedTrainerRecordId = null;
+            trainerHistoryDeleteConfirmRecordId = null;
 
             if (normalizedData.chars) {
                 chars = normalizedData.chars;
