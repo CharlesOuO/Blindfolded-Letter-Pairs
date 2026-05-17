@@ -413,22 +413,16 @@
                 </div>
             </div>
             <div class="card-area-test trainer-card">
-                <div id="trainer-type-badge" class="timer-badge">Corners</div>
-                <div id="trainer-timer" class="trainer-timer-display">0.00</div>
-                <div id="trainer-status" class="trainer-status" data-i18n="trainer_status_idle">Press Space to start</div>
                 <div class="trainer-panel">
                     <div class="trainer-panel-label" data-i18n="trainer_scramble_label">Scramble</div>
                     <div id="trainer-scramble" class="trainer-scramble-text"
                         data-i18n="trainer_scramble_placeholder">Press Next Scramble to begin.</div>
                 </div>
-                <div id="trainer-feedback" class="trainer-feedback" data-i18n="trainer_scramble_hint">
-                    Scramble first, press Space to start, and press any key to stop.
-                </div>
-            </div>
-            <div id="trainer-result-shell" class="trainer-result-shell hidden">
-                <div class="trainer-panel-label" data-i18n="trainer_last_result_label">Last Solve</div>
-                <div id="trainer-last-result" class="trainer-last-result">0.00</div>
-                <div class="trainer-penalty-row trainer-penalty-row-compact">
+                <div id="trainer-type-badge" class="timer-badge">Corners</div>
+                <div id="trainer-timer" class="trainer-timer-display">0.00</div>
+                <div id="trainer-status" class="trainer-status" data-i18n="trainer_status_idle">Press Space to start</div>
+                <div id="trainer-penalty-shell" class="trainer-penalty-shell hidden">
+                    <div class="trainer-penalty-row trainer-penalty-row-compact">
                     <button id="trainer-plus2-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('plus2')"
                         data-i18n="btn_penalty_plus2">+2</button>
                     <button id="trainer-dnf-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('dnf')"
@@ -439,6 +433,10 @@
                     <button id="trainer-delete-confirm-btn"
                         class="action-btn trainer-action-btn trainer-delete-confirm-btn hidden"
                         onclick="confirmDeleteLatestTrainerRecord()" data-i18n="btn_delete_confirm">Confirm</button>
+                    </div>
+                </div>
+                <div id="trainer-feedback" class="trainer-feedback" data-i18n="trainer_scramble_hint">
+                    Scramble first, press Space to start, and press any key to stop.
                 </div>
             </div>
             <div class="trainer-averages-shell">

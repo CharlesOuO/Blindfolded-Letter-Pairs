@@ -403,6 +403,7 @@ function sanitizeTrainerRecords(value) {
             penalty: allowedPenalties.has(record.penalty) ? record.penalty : 'ok',
             scramble: typeof record.scramble === 'string' ? record.scramble : '',
             pair: typeof record.pair === 'string' ? record.pair : '',
+            algorithm: typeof record.algorithm === 'string' ? record.algorithm : '',
             algorithmType: record.algorithmType === 'edge' ? 'edge' : 'corner',
             createdAt: Number.isFinite(Number(record.createdAt)) ? Number(record.createdAt) : Date.now()
         };
@@ -941,6 +942,110 @@ function invertMoveSequence(moves = []) {
     return moves.slice().reverse().map(invertMoveToken);
 }
 
+function mergeAdjacentSameBaseMoves(moves = []) {
+    const normalized = [];
+
+    moves.forEach((move) => {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) {
+            normalized.push(move);
+            return;
+        }
+
+        const currentMove = normalizeMoveToken(parsedMove);
+        const lastMove = normalized[normalized.length - 1];
+        const parsedLastMove = parseMoveToken(lastMove);
+
+        if (!parsedLastMove || parsedLastMove.base !== parsedMove.base) {
+            normalized.push(currentMove);
+            return;
+        }
+
+        const combinedAmount = (parsedLastMove.amount + parsedMove.amount) % 4;
+        normalized.pop();
+        if (combinedAmount !== 0) {
+            normalized.push(normalizeMoveToken({
+                base: parsedMove.base,
+                amount: combinedAmount
+            }));
+        }
+    });
+
+    return normalized;
+}
+
+function getMoveAxis(base = '') {
+    const face = String(base || '').trim().charAt(0).toUpperCase();
+    if (face === 'U' || face === 'D') return 'UD';
+    if (face === 'R' || face === 'L') return 'RL';
+    if (face === 'F' || face === 'B') return 'FB';
+    return null;
+}
+
+function collapseSameAxisMoves(parsedMoves = []) {
+    if (parsedMoves.length <= 1) {
+        return parsedMoves.map((move) => normalizeMoveToken(move));
+    }
+
+    const amountByBase = new Map();
+    const order = [];
+    parsedMoves.forEach((move) => {
+        if (!amountByBase.has(move.base)) {
+            amountByBase.set(move.base, 0);
+            order.push(move.base);
+        }
+        amountByBase.set(move.base, (amountByBase.get(move.base) + move.amount) % 4);
+    });
+
+    const collapsed = [];
+    order.forEach((base) => {
+        const amount = amountByBase.get(base);
+        if (!amount) return;
+        collapsed.push(normalizeMoveToken({ base, amount }));
+    });
+    return collapsed;
+}
+
+function normalizeTrainerScrambleMoves(moves = []) {
+    const adjacentNormalized = mergeAdjacentSameBaseMoves(moves);
+    const normalized = [];
+    let axisBuffer = [];
+    let currentAxis = null;
+
+    const flushAxisBuffer = () => {
+        if (axisBuffer.length === 0) return;
+        normalized.push(...collapseSameAxisMoves(axisBuffer));
+        axisBuffer = [];
+        currentAxis = null;
+    };
+
+    adjacentNormalized.forEach((move) => {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) {
+            flushAxisBuffer();
+            normalized.push(move);
+            return;
+        }
+
+        const axis = getMoveAxis(parsedMove.base);
+        if (!axis) {
+            flushAxisBuffer();
+            normalized.push(normalizeMoveToken(parsedMove));
+            return;
+        }
+
+        if (currentAxis && axis !== currentAxis) {
+            flushAxisBuffer();
+        }
+
+        currentAxis = axis;
+        axisBuffer.push(parsedMove);
+    });
+
+    flushAxisBuffer();
+    return mergeAdjacentSameBaseMoves(normalized);
+}
+
 function expandAlgorithmExpression(expression) {
     const normalized = String(expression || '').trim();
     if (!normalized) return [];
@@ -1047,6 +1152,12 @@ function updateTrainerAlgorithmButtons() {
     setActionButtonActive(document.getElementById('btn-trainer-type-edge'), currentTrainerAlgorithmType === 'edge');
 }
 
+function updateTrainerTypeBadge() {
+    const badge = document.getElementById('trainer-type-badge');
+    if (!badge) return;
+    badge.innerText = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+}
+
 function updateAlgorithmTypeButtons() {
     setActionButtonActive(document.getElementById('btn-algorithm-type-corner'), currentAlgorithmType === 'corner');
     setActionButtonActive(document.getElementById('btn-algorithm-type-edge'), currentAlgorithmType === 'edge');
@@ -1076,6 +1187,7 @@ function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
     trainerDeleteConfirmArmed = false;
     updateTrainerAlgorithmButtons();
+    updateTrainerTypeBadge();
     generateTrainerScramble({ silent: true, resetTimerDisplay: true });
 }
 
@@ -1108,6 +1220,95 @@ function getTrainerCandidatePairs() {
     }
 
     return { pairs };
+}
+
+function getTrainerPairScrambleMoves(pair) {
+    const algorithmText = getPairContentValue(pair, currentTrainerAlgorithmType);
+    const expandedMoves = expandAlgorithmExpression(algorithmText);
+    return invertMoveSequence(expandedMoves);
+}
+
+function formatTrainerCommutatorText(text = '') {
+    return String(text || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/\[\s*/g, '[')
+        .replace(/\s*\]/g, ']');
+}
+
+function getTrainerRecordAlgorithmText(record) {
+    if (!record) return '';
+    const storedAlgorithm = formatTrainerCommutatorText(record.algorithm || '');
+    if (storedAlgorithm) return storedAlgorithm;
+
+    if (!record.pair) return '';
+    const fallbackAlgorithm = getPairContentValue(record.pair, record.algorithmType);
+    return formatTrainerCommutatorText(fallbackAlgorithm);
+}
+
+function chooseTrainerPairFromPool(pool) {
+    let nextPool = [...pool];
+    if (nextPool.length > 1 && lastTrainerPair) {
+        const filteredPool = nextPool.filter((pair) => pair !== lastTrainerPair);
+        if (filteredPool.length > 0) nextPool = filteredPool;
+    }
+    return nextPool[Math.floor(Math.random() * nextPool.length)];
+}
+
+function isOuterFaceBase(base = '') {
+    const face = String(base || '').trim().toUpperCase();
+    return face === 'U' || face === 'D' || face === 'R' || face === 'L' || face === 'F' || face === 'B';
+}
+
+function areCommutingOppositeOuterFaceMoves(leftMove, rightMove) {
+    const parsedLeft = parseMoveToken(leftMove);
+    const parsedRight = parseMoveToken(rightMove);
+    if (!parsedLeft || !parsedRight) return false;
+
+    const leftBase = String(parsedLeft.base || '').toUpperCase();
+    const rightBase = String(parsedRight.base || '').toUpperCase();
+    if (!isOuterFaceBase(leftBase) || !isOuterFaceBase(rightBase)) return false;
+
+    return (
+        (leftBase === 'U' && rightBase === 'D') || (leftBase === 'D' && rightBase === 'U') ||
+        (leftBase === 'R' && rightBase === 'L') || (leftBase === 'L' && rightBase === 'R') ||
+        (leftBase === 'F' && rightBase === 'B') || (leftBase === 'B' && rightBase === 'F')
+    );
+}
+
+function shuffleCommutingOppositeFaceMoves(moves = [], passes = 2) {
+    const shuffledMoves = [...moves];
+    const passCount = Math.max(1, Math.floor(Number(passes) || 1));
+
+    for (let passIndex = 0; passIndex < passCount; passIndex++) {
+        for (let index = 0; index < shuffledMoves.length - 1; index++) {
+            if (!areCommutingOppositeOuterFaceMoves(shuffledMoves[index], shuffledMoves[index + 1])) continue;
+            if (Math.random() < 0.5) {
+                const current = shuffledMoves[index];
+                shuffledMoves[index] = shuffledMoves[index + 1];
+                shuffledMoves[index + 1] = current;
+                index += 1;
+            }
+        }
+    }
+
+    return shuffledMoves;
+}
+
+function buildRomanTrainerScrambleMoves(baseMoves = []) {
+    const normalizedMoves = normalizeTrainerScrambleMoves(baseMoves);
+    if (normalizedMoves.length === 0) return normalizedMoves;
+
+    const shuffledMoves = shuffleCommutingOppositeFaceMoves(
+        normalizedMoves,
+        2 + Math.floor(Math.random() * 2)
+    );
+    const compactMoves = mergeAdjacentSameBaseMoves(shuffledMoves);
+
+    if (compactMoves.length > 0) return compactMoves;
+    return normalizedMoves;
 }
 
 function isEditableElement(element) {
@@ -1228,12 +1429,10 @@ function updateTrainerDeleteButtons() {
 
 function renderTrainerRecords() {
     const latestRecord = trainerRecords[0] || null;
-    const resultShellEl = document.getElementById('trainer-result-shell');
-    const lastResultEl = document.getElementById('trainer-last-result');
+    const penaltyShellEl = document.getElementById('trainer-penalty-shell');
     const historyEl = document.getElementById('trainer-history');
 
-    if (resultShellEl) resultShellEl.classList.toggle('hidden', !latestRecord);
-    if (lastResultEl) lastResultEl.innerText = getTrainerDisplayTime(latestRecord);
+    if (penaltyShellEl) penaltyShellEl.classList.toggle('hidden', !latestRecord);
 
     setActionButtonActive(document.getElementById('trainer-plus2-btn'), latestRecord?.penalty === 'plus2');
     setActionButtonActive(document.getElementById('trainer-dnf-btn'), latestRecord?.penalty === 'dnf');
@@ -1265,11 +1464,8 @@ function renderTrainerRecords() {
                 const metaParts = [];
                 if (record.pair) metaParts.push(record.pair.toUpperCase());
                 metaParts.push(t(record.algorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners'));
-                metaParts.push(new Date(record.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                }));
+                const algorithmText = getTrainerRecordAlgorithmText(record);
+                if (algorithmText) metaParts.push(algorithmText);
                 metaEl.innerText = metaParts.join(' / ');
                 if (record.scramble) itemEl.title = record.scramble;
 
@@ -1334,12 +1530,17 @@ function stopTrainerTimer() {
     trainerTimerState = 'idle';
     updateTrainerTimerVisualState();
 
+    const recordAlgorithm = currentTrainerPair
+        ? formatTrainerCommutatorText(getPairContentValue(currentTrainerPair, currentTrainerAlgorithmType))
+        : '';
+
     const nextRecord = {
         id: `trainer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         rawTimeMs,
         penalty: 'ok',
         scramble: currentTrainerScramble,
         pair: currentTrainerPair || '',
+        algorithm: recordAlgorithm,
         algorithmType: currentTrainerAlgorithmType,
         createdAt: Date.now()
     };
@@ -1449,24 +1650,27 @@ function generateTrainerScramble(options = {}) {
         return;
     }
 
-    let pool = [...result.pairs];
-    if (pool.length > 1 && lastTrainerPair) {
-        const filteredPool = pool.filter((pair) => pair !== lastTrainerPair);
-        if (filteredPool.length > 0) pool = filteredPool;
-    }
+    const pairMovesMap = {};
+    const validPairs = [];
+    result.pairs.forEach((pair) => {
+        try {
+            const moves = getTrainerPairScrambleMoves(pair);
+            if (moves.length === 0) return;
+            pairMovesMap[pair] = moves;
+            validPairs.push(pair);
+        } catch (error) {
+            // Ignore invalid algorithms so one bad entry does not block all scramble generation.
+        }
+    });
 
-    const pair = pool[Math.floor(Math.random() * pool.length)];
-    const algorithmText = getPairContentValue(pair, currentTrainerAlgorithmType);
-
-    let scrambleMoves;
-    try {
-        const expandedMoves = expandAlgorithmExpression(algorithmText);
-        scrambleMoves = invertMoveSequence(expandedMoves);
-    } catch (error) {
+    if (validPairs.length === 0) {
         resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
         if (!options.silent) alert(t('alert_invalid_algorithm_format'));
         return;
     }
+
+    const pair = chooseTrainerPairFromPool(validPairs);
+    const scrambleMoves = buildRomanTrainerScrambleMoves(pairMovesMap[pair] || []);
 
     if (!scrambleMoves || scrambleMoves.length === 0) {
         resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
@@ -1800,7 +2004,7 @@ function applyLanguage() {
     updateDropdownLabel('trainer_start'); updateDropdownLabel('trainer_end');
     updateMemoryContentModeButtons();
     updateTrainerAlgorithmButtons();
-    document.getElementById('trainer-type-badge').innerText = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    updateTrainerTypeBadge();
     document.getElementById('trainer-feedback').innerText = t('trainer_scramble_hint');
     if (!currentTrainerScramble) document.getElementById('trainer-scramble').innerText = t('trainer_scramble_placeholder');
     setTrainerStatus(currentTrainerStatusKey);
@@ -1937,7 +2141,7 @@ function switchTab(tab) {
     if (tab === 'list') renderCurrentListView();
     if (tab === 'memory') nextMemoryCard();
     if (tab === 'trainer') {
-        if (!currentTrainerScramble) generateTrainerScramble({ silent: true });
+        generateTrainerScramble({ silent: true });
         applyLanguage();
     }
 }
