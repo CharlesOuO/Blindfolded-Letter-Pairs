@@ -1833,13 +1833,31 @@ body::after {
 .trainer-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
     cursor: pointer;
+}
+
+#view-trainer .card-area-test.trainer-card {
+    min-height: 520px;
+    padding-top: 22px;
+    padding-bottom: 20px;
+    justify-content: flex-start;
+    align-items: stretch;
 }
 
 #view-trainer .trainer-card .trainer-panel,
 #view-trainer .trainer-card #trainer-penalty-shell {
     cursor: default;
+}
+
+#view-trainer .trainer-card .trainer-timer-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 #view-trainer .trainer-averages-shell,
@@ -1883,7 +1901,7 @@ body::after {
 }
 
 .trainer-status {
-    min-height: 24px;
+    min-height: 20px;
     color: #475569;
     font-size: 1rem;
     font-weight: 700;
@@ -1917,13 +1935,6 @@ body::after {
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
-}
-
-.trainer-feedback {
-    min-height: 24px;
-    color: #475569;
-    font-size: 0.94rem;
-    line-height: 1.45;
 }
 
 .trainer-penalty-row {

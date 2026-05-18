@@ -1221,9 +1221,11 @@ function updateTrainerAlgorithmButtons() {
 }
 
 function updateTrainerTypeBadge() {
+    const modeLabel = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
     const badge = document.getElementById('trainer-type-badge');
-    if (!badge) return;
-    badge.innerText = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    const statusEl = document.getElementById('trainer-status');
+    if (badge) badge.innerText = modeLabel;
+    if (statusEl) statusEl.innerText = modeLabel;
 }
 
 function updateAlgorithmTypeButtons() {
@@ -1357,8 +1359,6 @@ function applyTrainerScrambleSnapshot(snapshot, options = {}) {
     lastTrainerPair = snapshot.pair || null;
 
     setTrainerScrambleDisplay(currentTrainerScramble);
-    const feedbackEl = document.getElementById('trainer-feedback');
-    if (feedbackEl) feedbackEl.innerText = t('trainer_scramble_hint');
 
     if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
     updateTrainerScrambleNavButtons();
@@ -1559,8 +1559,7 @@ function renderTrainerAverages() {
 
 function setTrainerStatus(statusKey = 'trainer_status_idle') {
     currentTrainerStatusKey = statusKey;
-    const statusEl = document.getElementById('trainer-status');
-    if (statusEl) statusEl.innerText = t(statusKey);
+    updateTrainerTypeBadge();
 }
 
 function setTrainerTimerDisplay(value = '0.00') {
@@ -1958,9 +1957,7 @@ function resetTrainerView(options = {}) {
     currentTrainerPair = null;
     currentTrainerScramble = '';
 
-    const feedbackEl = document.getElementById('trainer-feedback');
     setTrainerScrambleDisplay('');
-    if (feedbackEl) feedbackEl.innerText = t('trainer_scramble_hint');
 
     if (options.showNoScramble) {
         setTrainerStatus('trainer_status_no_scramble');
@@ -2341,7 +2338,6 @@ function applyLanguage() {
     updateMemoryContentModeButtons();
     updateTrainerAlgorithmButtons();
     updateTrainerTypeBadge();
-    document.getElementById('trainer-feedback').innerText = t('trainer_scramble_hint');
     if (!currentTrainerScramble) document.getElementById('trainer-scramble').innerText = t('trainer_scramble_placeholder');
     setTrainerStatus(currentTrainerStatusKey);
     renderTrainerRecords();
