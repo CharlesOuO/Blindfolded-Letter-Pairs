@@ -39,6 +39,8 @@ let currentMemoryContentModes = ['word'];
 let currentTrainerAlgorithmType = 'corner';
 let currentTrainerPair = null;
 let currentTrainerScramble = '';
+let currentTrainerAlgorithm = '';
+let currentTrainerAlgorithmCycleLabel = '';
 let lastTrainerPair = null;
 let trainerRecords = [];
 let latestTrainerRecordId = null;
@@ -50,18 +52,27 @@ let currentTrainerStatusKey = 'trainer_status_idle';
 let trainerDeleteConfirmArmed = false;
 let expandedTrainerRecordId = null;
 let trainerHistoryDeleteConfirmRecordId = null;
+let trainerClearMenuOpen = false;
+let trainerCubeSolverInitState = 'unknown';
+let trainerTouchTapState = null;
+let trainerTouchSuppressClickUntil = 0;
 let trainerScrambleNavigation = {
     corner: { items: [], index: -1 },
     edge: { items: [], index: -1 }
+};
+let trainerAlgorithmDrawState = {
+    corner: {},
+    edge: {}
 };
 let currentTab = 'list';
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
 const MEMORY_REPEAT_GAP = 5;
 const TAB_ORDER = ['list', 'memory', 'trainer', 'data'];
-const TRAINER_RECORDS_LIMIT = 200;
-const TRAINER_HISTORY_PREVIEW_LIMIT = 8;
 const TRAINER_AVERAGE_COUNTS = [5, 12, 50, 100];
 const TRAINER_SCRAMBLE_HISTORY_LIMIT = 200;
+const TRAINER_CUBE_SOLVER_MAX_DEPTH = 22;
+const TRAINER_TOUCH_TAP_MAX_MOVE_PX = 14;
+const TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS = 700;
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -181,6 +192,11 @@ Object.assign(translations['zh-TW'], {
     trainer_history_label: "\u7d00\u9304",
     trainer_solution_label: "\u89e3\u6cd5",
     trainer_history_empty: "\u9084\u6c92\u6709\u8a08\u6642\u7d00\u9304",
+    btn_clear_records: "\u6e05\u9664\u7d00\u9304",
+    btn_clear_corners_records: "\u522a\u9664 Corners",
+    btn_clear_edges_records: "\u522a\u9664 Edges",
+    confirm_clear_trainer_records: "\u78ba\u5b9a\u8981\u522a\u9664\u6240\u6709 {type} \u7d00\u9304\uff08\u5171 {count} \u7b46\uff09\u55ce\uff1f\u6b64\u52d5\u4f5c\u7121\u6cd5\u5fa9\u539f\u3002",
+    alert_no_trainer_records_type: "\u76ee\u524d\u6c92\u6709 {type} \u7d00\u9304\u53ef\u522a\u9664\u3002",
     alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210 scramble\u3002",
     btn_toggle_lang: "English / \u4e2d\u6587",
     page_title: "3BLD(3 style & letter pairs) practice",
@@ -241,6 +257,11 @@ Object.assign(translations.en, {
     trainer_history_label: "History",
     trainer_solution_label: "Solution",
     trainer_history_empty: "No solves yet.",
+    btn_clear_records: "Clear Records",
+    btn_clear_corners_records: "Delete Corners",
+    btn_clear_edges_records: "Delete Edges",
+    confirm_clear_trainer_records: "Delete all {type} records ({count})? This action cannot be undone.",
+    alert_no_trainer_records_type: "No {type} records to delete.",
     alert_invalid_algorithm_format: "This algorithm format cannot be converted into a scramble yet.",
     btn_toggle_lang: "\u4e2d\u6587 / English",
     page_title: "3BLD(3 style & letter pairs) practice"
@@ -424,35 +445,49 @@ function sanitizeTrainerRecords(value) {
 function normalizeBackupPayload(value) {
     if (!isPlainObject(value)) throw new Error('Invalid backup payload');
 
+    const sections = isPlainObject(value.sections) ? value.sections : null;
+    const letterPairsSection = sections && isPlainObject(sections.letterPairs) ? sections.letterPairs : {};
+    const statusSection = sections && isPlainObject(sections.status) ? sections.status : {};
+    const trainerSection = sections && isPlainObject(sections.trainer) ? sections.trainer : {};
+    const settingsSection = sections && isPlainObject(sections.settings) ? sections.settings : {};
+
+    const rawDict = letterPairsSection.word ?? value.dict;
+    const rawCornerFormulaDict = letterPairsSection.corner ?? value.cornerFormulaDict ?? value.formulaDict;
+    const rawEdgeFormulaDict = letterPairsSection.edge ?? value.edgeFormulaDict;
+    const rawStatus = statusSection.word ?? value.status;
+    const rawCornerFormulaStatus = statusSection.corner ?? value.cornerFormulaStatus ?? value.formulaStatus;
+    const rawEdgeFormulaStatus = statusSection.edge ?? value.edgeFormulaStatus;
+    const rawTrainerRecords = trainerSection.records ?? value.trainerRecords;
+    const rawChars = settingsSection.chars ?? value.chars;
+    const rawLang = settingsSection.lang ?? value.lang;
+
     const knownKeys = [
-        'dict',
-        'formulaDict',
-        'cornerFormulaDict',
-        'edgeFormulaDict',
-        'status',
-        'formulaStatus',
-        'cornerFormulaStatus',
-        'edgeFormulaStatus',
-        'trainerRecords',
-        'chars',
-        'lang'
+        rawDict,
+        rawCornerFormulaDict,
+        rawEdgeFormulaDict,
+        rawStatus,
+        rawCornerFormulaStatus,
+        rawEdgeFormulaStatus,
+        rawTrainerRecords,
+        rawChars,
+        rawLang
     ];
-    const hasKnownKey = knownKeys.some((key) => Object.prototype.hasOwnProperty.call(value, key));
+    const hasKnownKey = knownKeys.some((sectionValue) => sectionValue != null);
     if (!hasKnownKey) throw new Error('Unknown backup format');
 
-    const normalizedChars = value.chars == null ? null : sanitizeChars(value.chars);
-    if (value.chars != null && !normalizedChars) throw new Error('Invalid chars');
+    const normalizedChars = rawChars == null ? null : sanitizeChars(rawChars);
+    if (rawChars != null && !normalizedChars) throw new Error('Invalid chars');
 
-    const normalizedLang = value.lang === 'zh-TW' || value.lang === 'en' ? value.lang : null;
+    const normalizedLang = rawLang === 'zh-TW' || rawLang === 'en' ? rawLang : null;
 
     return {
-        dict: sanitizeStringMap(value.dict),
-        cornerFormulaDict: sanitizeStringMap(value.cornerFormulaDict || value.formulaDict),
-        edgeFormulaDict: sanitizeStringMap(value.edgeFormulaDict),
-        status: sanitizeStatusMap(value.status),
-        cornerFormulaStatus: sanitizeStatusMap(value.cornerFormulaStatus || value.formulaStatus),
-        edgeFormulaStatus: sanitizeStatusMap(value.edgeFormulaStatus),
-        trainerRecords: sanitizeTrainerRecords(value.trainerRecords),
+        dict: sanitizeStringMap(rawDict),
+        cornerFormulaDict: sanitizeStringMap(rawCornerFormulaDict),
+        edgeFormulaDict: sanitizeStringMap(rawEdgeFormulaDict),
+        status: sanitizeStatusMap(rawStatus),
+        cornerFormulaStatus: sanitizeStatusMap(rawCornerFormulaStatus),
+        edgeFormulaStatus: sanitizeStatusMap(rawEdgeFormulaStatus),
+        trainerRecords: sanitizeTrainerRecords(rawTrainerRecords),
         chars: normalizedChars,
         lang: normalizedLang
     };
@@ -493,11 +528,15 @@ function resetTrainerScrambleNavigation() {
         corner: { items: [], index: -1 },
         edge: { items: [], index: -1 }
     };
+    trainerAlgorithmDrawState = {
+        corner: {},
+        edge: {}
+    };
     updateTrainerScrambleNavButtons();
 }
 
 function saveTrainerRecords(records) {
-    trainerRecords = records.slice(0, TRAINER_RECORDS_LIMIT);
+    trainerRecords = records.slice();
     syncLatestTrainerRecordId();
     trainerDeleteConfirmArmed = false;
     if (expandedTrainerRecordId && !trainerRecords.some((record) => record.id === expandedTrainerRecordId)) {
@@ -548,9 +587,14 @@ function setupEventListeners() {
             closeAllDropdowns();
         }
 
+        if (!targetEl || !targetEl.closest('#trainer-history-clear-group')) {
+            setTrainerClearMenuOpen(false);
+        }
+
         const activeTab = document.querySelector('.view-section.active')?.id;
         if (activeTab !== 'view-trainer') return;
         if (!expandedTrainerRecordId) return;
+        if (targetEl && targetEl.closest('#trainer-history-clear-group')) return;
         if (targetEl && targetEl.closest('#trainer-history .trainer-history-item')) return;
 
         expandedTrainerRecordId = null;
@@ -579,6 +623,10 @@ function setupEventListeners() {
     const trainerCardEl = document.querySelector('#view-trainer .trainer-card');
     if (trainerCardEl) {
         trainerCardEl.addEventListener('click', handleTrainerCardTap);
+        trainerCardEl.addEventListener('touchstart', handleTrainerCardTouchStart, { passive: false });
+        trainerCardEl.addEventListener('touchmove', handleTrainerCardTouchMove, { passive: true });
+        trainerCardEl.addEventListener('touchend', handleTrainerCardTouchEnd, { passive: false });
+        trainerCardEl.addEventListener('touchcancel', handleTrainerCardTouchCancel, { passive: true });
     }
 
     const listContainer = document.getElementById('grid-area');
@@ -1222,10 +1270,12 @@ function updateTrainerAlgorithmButtons() {
 
 function updateTrainerTypeBadge() {
     const modeLabel = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    const progressLabel = currentTrainerAlgorithmCycleLabel ? ` | ${currentTrainerAlgorithmCycleLabel}` : '';
+    const displayText = `${modeLabel}${progressLabel}`;
     const badge = document.getElementById('trainer-type-badge');
     const statusEl = document.getElementById('trainer-status');
-    if (badge) badge.innerText = modeLabel;
-    if (statusEl) statusEl.innerText = modeLabel;
+    if (badge) badge.innerText = displayText;
+    if (statusEl) statusEl.innerText = displayText;
 }
 
 function updateAlgorithmTypeButtons() {
@@ -1255,6 +1305,8 @@ function toggleMemoryContentMode(mode) {
 
 function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    currentTrainerAlgorithm = '';
+    currentTrainerAlgorithmCycleLabel = '';
     clearTrainerInlineStates();
     updateTrainerAlgorithmButtons();
     updateTrainerTypeBadge();
@@ -1294,10 +1346,119 @@ function getTrainerCandidatePairs() {
     return { pairs };
 }
 
-function getTrainerPairScrambleMoves(pair) {
-    const algorithmText = getPairContentValue(pair, currentTrainerAlgorithmType);
-    const expandedMoves = expandAlgorithmExpression(algorithmText);
+function getTrainerPairScrambleMoves(pair, algorithmText = '') {
+    const selectedAlgorithmText = String(algorithmText || '').trim() || getPairContentValue(pair, currentTrainerAlgorithmType);
+    if (!selectedAlgorithmText) return [];
+    const expandedMoves = expandAlgorithmExpression(selectedAlgorithmText);
     return invertMoveSequence(expandedMoves);
+}
+
+function getTrainerPairAlgorithmCandidates(pair) {
+    const algorithmText = getPairContentValue(pair, currentTrainerAlgorithmType);
+    const normalized = String(algorithmText || '').replace(/\r/g, '').trim();
+    if (!normalized) return [];
+
+    const lineCandidates = normalized
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lineCandidates.length > 1) return lineCandidates;
+    return [normalized];
+}
+
+function getTrainerDrawStateStore(type = currentTrainerAlgorithmType) {
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerAlgorithmDrawState[algorithmType]) trainerAlgorithmDrawState[algorithmType] = {};
+    return trainerAlgorithmDrawState[algorithmType];
+}
+
+function buildTrainerAlgorithmCycleSignature(algorithmEntries = []) {
+    return algorithmEntries.map((entry) => entry.algorithm).join('\u241E');
+}
+
+function shuffleTrainerArray(items = []) {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index--) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        const current = result[index];
+        result[index] = result[randomIndex];
+        result[randomIndex] = current;
+    }
+    return result;
+}
+
+function chooseTrainerAlgorithmFromPool(pair, algorithmEntries = []) {
+    if (!pair || algorithmEntries.length === 0) return null;
+
+    const store = getTrainerDrawStateStore();
+    const signature = buildTrainerAlgorithmCycleSignature(algorithmEntries);
+    let state = store[pair];
+    if (!state || state.signature !== signature || state.total !== algorithmEntries.length) {
+        state = {
+            signature,
+            total: algorithmEntries.length,
+            drawOrder: [],
+            cycleDrawCount: 0
+        };
+        store[pair] = state;
+    }
+
+    if (state.drawOrder.length === 0) {
+        state.drawOrder = shuffleTrainerArray(algorithmEntries.map((_, index) => index));
+        state.cycleDrawCount = 0;
+    }
+
+    const nextIndex = state.drawOrder.pop();
+    if (!Number.isInteger(nextIndex) || !algorithmEntries[nextIndex]) return null;
+
+    state.cycleDrawCount += 1;
+    return {
+        ...algorithmEntries[nextIndex],
+        cycleLabel: `C${state.cycleDrawCount}/${algorithmEntries.length}`
+    };
+}
+
+function getTrainerPairAlgorithmEntries(pair) {
+    const candidates = getTrainerPairAlgorithmCandidates(pair);
+    if (candidates.length === 0) return [];
+
+    const validEntries = [];
+    candidates.forEach((candidateText) => {
+        const candidateVariants = [candidateText];
+        const trimmedNumberPrefix = String(candidateText)
+            .replace(/^\s*\d+\s*[\.\)\]:：、-]\s*/, '')
+            .trim();
+        if (trimmedNumberPrefix && trimmedNumberPrefix !== candidateText) candidateVariants.push(trimmedNumberPrefix);
+
+        try {
+            let parsedEntry = null;
+            for (const candidateVariant of candidateVariants) {
+                try {
+                    const moves = getTrainerPairScrambleMoves(pair, candidateVariant);
+                    if (moves.length === 0) continue;
+                    parsedEntry = {
+                        algorithm: formatTrainerCommutatorText(candidateVariant),
+                        moves
+                    };
+                    break;
+                } catch (innerError) {
+                    // Keep trying fallback variants.
+                }
+            }
+            if (parsedEntry) validEntries.push(parsedEntry);
+        } catch (outerError) {
+            // Ignore invalid lines so a single bad algorithm does not block the whole case.
+        }
+    });
+
+    return validEntries;
+}
+
+function getTrainerPairMovesWithCycle(pair, algorithmEntries = null) {
+    const validEntries = Array.isArray(algorithmEntries) ? algorithmEntries : getTrainerPairAlgorithmEntries(pair);
+    if (validEntries.length === 0) return null;
+    return chooseTrainerAlgorithmFromPool(pair, validEntries);
 }
 
 function formatTrainerCommutatorText(text = '') {
@@ -1356,16 +1517,19 @@ function applyTrainerScrambleSnapshot(snapshot, options = {}) {
 
     currentTrainerPair = snapshot.pair || null;
     currentTrainerScramble = snapshot.scramble;
+    currentTrainerAlgorithm = formatTrainerCommutatorText(snapshot.algorithm || '');
+    currentTrainerAlgorithmCycleLabel = String(snapshot.cycleLabel || '').trim();
     lastTrainerPair = snapshot.pair || null;
 
     setTrainerScrambleDisplay(currentTrainerScramble);
+    updateTrainerTypeBadge();
 
     if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
     updateTrainerScrambleNavButtons();
     return true;
 }
 
-function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAlgorithmType) {
+function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAlgorithmType, options = {}) {
     if (!pair || !scramble) return;
 
     const navState = getTrainerScrambleNavState(type);
@@ -1376,6 +1540,8 @@ function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAl
     navState.items.push({
         pair,
         scramble,
+        algorithm: formatTrainerCommutatorText(options.algorithm || ''),
+        cycleLabel: String(options.cycleLabel || '').trim(),
         algorithmType: normalizeTrainerAlgorithmType(type)
     });
 
@@ -1423,58 +1589,96 @@ function goToNextTrainerScramble() {
     generateTrainerScramble();
 }
 
-function isOuterFaceBase(base = '') {
-    const face = String(base || '').trim().toUpperCase();
-    return face === 'U' || face === 'D' || face === 'R' || face === 'L' || face === 'F' || face === 'B';
+function getTrainerCubeSolverConstructor() {
+    if (typeof window !== 'undefined' && typeof window.Cube === 'function') return window.Cube;
+    if (typeof Cube === 'function') return Cube;
+    return null;
 }
 
-function areCommutingOppositeOuterFaceMoves(leftMove, rightMove) {
-    const parsedLeft = parseMoveToken(leftMove);
-    const parsedRight = parseMoveToken(rightMove);
-    if (!parsedLeft || !parsedRight) return false;
+function ensureTrainerCubeSolverReady() {
+    if (trainerCubeSolverInitState === 'ready') return true;
+    if (trainerCubeSolverInitState === 'failed') return false;
 
-    const leftBase = String(parsedLeft.base || '').toUpperCase();
-    const rightBase = String(parsedRight.base || '').toUpperCase();
-    if (!isOuterFaceBase(leftBase) || !isOuterFaceBase(rightBase)) return false;
-
-    return (
-        (leftBase === 'U' && rightBase === 'D') || (leftBase === 'D' && rightBase === 'U') ||
-        (leftBase === 'R' && rightBase === 'L') || (leftBase === 'L' && rightBase === 'R') ||
-        (leftBase === 'F' && rightBase === 'B') || (leftBase === 'B' && rightBase === 'F')
-    );
-}
-
-function shuffleCommutingOppositeFaceMoves(moves = [], passes = 2) {
-    const shuffledMoves = [...moves];
-    const passCount = Math.max(1, Math.floor(Number(passes) || 1));
-
-    for (let passIndex = 0; passIndex < passCount; passIndex++) {
-        for (let index = 0; index < shuffledMoves.length - 1; index++) {
-            if (!areCommutingOppositeOuterFaceMoves(shuffledMoves[index], shuffledMoves[index + 1])) continue;
-            if (Math.random() < 0.5) {
-                const current = shuffledMoves[index];
-                shuffledMoves[index] = shuffledMoves[index + 1];
-                shuffledMoves[index + 1] = current;
-                index += 1;
-            }
-        }
+    const solver = getTrainerCubeSolverConstructor();
+    if (!solver || typeof solver.initSolver !== 'function' || typeof solver.inverse !== 'function') {
+        trainerCubeSolverInitState = 'failed';
+        return false;
     }
 
-    return shuffledMoves;
+    try {
+        solver.initSolver();
+        trainerCubeSolverInitState = 'ready';
+        return true;
+    } catch (error) {
+        trainerCubeSolverInitState = 'failed';
+        return false;
+    }
 }
 
-function buildRomanTrainerScrambleMoves(baseMoves = []) {
+function normalizeTrainerCubeSolverMoveBase(base = '') {
+    const rawBase = String(base || '').trim();
+    if (!rawBase) return '';
+
+    if (/^[URFDLB]$/.test(rawBase)) return rawBase;
+
+    const lowerBase = rawBase.toLowerCase();
+    if (lowerBase === 'm') return 'M';
+    if (lowerBase === 'e') return 'E';
+    if (lowerBase === 's') return 'S';
+    if (lowerBase === 'x' || lowerBase === 'y' || lowerBase === 'z') return lowerBase;
+    if (lowerBase === 'u' || lowerBase === 'uw') return 'u';
+    if (lowerBase === 'r' || lowerBase === 'rw') return 'r';
+    if (lowerBase === 'f' || lowerBase === 'fw') return 'f';
+    if (lowerBase === 'd' || lowerBase === 'dw') return 'd';
+    if (lowerBase === 'l' || lowerBase === 'lw') return 'l';
+    if (lowerBase === 'b' || lowerBase === 'bw') return 'b';
+
+    return '';
+}
+
+function toTrainerCubeSolverMoves(moves = []) {
+    const convertedMoves = [];
+    for (const move of moves) {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) return null;
+
+        const normalizedBase = normalizeTrainerCubeSolverMoveBase(parsedMove.base);
+        if (!normalizedBase) return null;
+
+        convertedMoves.push(normalizeMoveToken({
+            base: normalizedBase,
+            amount: parsedMove.amount
+        }));
+    }
+    return convertedMoves;
+}
+
+function buildCubeSolverTrainerScrambleMoves(baseMoves = []) {
     const normalizedMoves = normalizeTrainerScrambleMoves(baseMoves);
     if (normalizedMoves.length === 0) return normalizedMoves;
 
-    const shuffledMoves = shuffleCommutingOppositeFaceMoves(
-        normalizedMoves,
-        2 + Math.floor(Math.random() * 2)
-    );
-    const compactMoves = mergeAdjacentSameBaseMoves(shuffledMoves);
+    if (!ensureTrainerCubeSolverReady()) return null;
 
-    if (compactMoves.length > 0) return compactMoves;
-    return normalizedMoves;
+    const solverMoves = toTrainerCubeSolverMoves(normalizedMoves);
+    if (!solverMoves || solverMoves.length === 0) return null;
+
+    const solver = getTrainerCubeSolverConstructor();
+    if (!solver) return null;
+
+    try {
+        const cube = new solver();
+        cube.move(solverMoves.join(' '));
+
+        const solution = cube.solve(TRAINER_CUBE_SOLVER_MAX_DEPTH);
+        const scrambleText = solver.inverse(solution || '');
+        const scrambleMoves = normalizeTrainerScrambleMoves(parseMoveSequence(scrambleText));
+
+        if (scrambleMoves.length > 0) return scrambleMoves;
+    } catch (error) {
+        return null;
+    }
+
+    return null;
 }
 
 function isEditableElement(element) {
@@ -1592,6 +1796,49 @@ function updateTrainerDeleteButtons() {
     confirmBtn.classList.toggle('hidden', !trainerDeleteConfirmArmed);
 }
 
+function setTrainerClearMenuOpen(isOpen) {
+    trainerClearMenuOpen = !!isOpen;
+
+    const menuEl = document.getElementById('trainer-clear-menu');
+    const buttonEl = document.getElementById('trainer-clear-menu-btn');
+    if (menuEl) menuEl.classList.toggle('hidden', !trainerClearMenuOpen);
+    if (buttonEl) {
+        buttonEl.setAttribute('aria-expanded', String(trainerClearMenuOpen));
+        setActionButtonActive(buttonEl, trainerClearMenuOpen);
+    }
+}
+
+function toggleTrainerClearMenu(event) {
+    if (event) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+    }
+    setTrainerClearMenuOpen(!trainerClearMenuOpen);
+}
+
+function requestClearTrainerRecords(type) {
+    const normalizedType = normalizeTrainerAlgorithmType(type);
+    const typeLabel = t(normalizedType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    const targetRecords = trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) === normalizedType);
+
+    setTrainerClearMenuOpen(false);
+    if (targetRecords.length === 0) {
+        alert(t('alert_no_trainer_records_type', { type: typeLabel }));
+        return;
+    }
+
+    const confirmed = confirm(t('confirm_clear_trainer_records', { type: typeLabel, count: targetRecords.length }));
+    if (!confirmed) return;
+
+    trainerDeleteConfirmArmed = false;
+    trainerHistoryDeleteConfirmRecordId = null;
+    expandedTrainerRecordId = null;
+    saveTrainerRecords(
+        trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) !== normalizedType)
+    );
+    setTrainerStatus(currentTrainerScramble ? 'trainer_status_idle' : 'trainer_status_no_scramble');
+}
+
 function toggleTrainerRecordExpanded(recordId) {
     if (!recordId) return;
 
@@ -1665,7 +1912,7 @@ function renderTrainerRecords() {
             historyEl.appendChild(emptyEl);
         } else {
             const fragment = document.createDocumentFragment();
-            sessionRecords.slice(0, TRAINER_HISTORY_PREVIEW_LIMIT).forEach((record, index) => {
+            sessionRecords.forEach((record, index) => {
                 const isExpanded = record.id === expandedTrainerRecordId;
                 const itemEl = document.createElement('div');
                 itemEl.className = `trainer-history-item${index === 0 ? ' is-latest' : ''}${isExpanded ? ' is-expanded' : ''}`;
@@ -1832,9 +2079,9 @@ function stopTrainerTimer() {
     trainerTimerState = 'idle';
     updateTrainerTimerVisualState();
 
-    const recordAlgorithm = currentTrainerPair
-        ? formatTrainerCommutatorText(getPairContentValue(currentTrainerPair, currentTrainerAlgorithmType))
-        : '';
+    const recordAlgorithm = formatTrainerCommutatorText(
+        currentTrainerAlgorithm || getPairContentValue(currentTrainerPair || '', currentTrainerAlgorithmType)
+    );
 
     const nextRecord = {
         id: `trainer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1914,9 +2161,107 @@ function handleTrainerKeyUp(event) {
     return false;
 }
 
+function shouldSuppressTrainerGhostClick(event) {
+    if (event?.type !== 'click') return false;
+    if (Date.now() > trainerTouchSuppressClickUntil) return false;
+
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    return true;
+}
+
+function canHandleTrainerCardTapTarget(targetEl) {
+    if (!(targetEl instanceof Element)) return false;
+    if (targetEl.closest('.trainer-panel')) return false;
+    if (targetEl.closest('#trainer-penalty-shell')) return false;
+    if (targetEl.closest('button, a, input, textarea, select, label')) return false;
+    return true;
+}
+
+function readTrainerTouchPoint(event, identifier = null) {
+    if (!event) return null;
+
+    const touchLists = [event.touches, event.changedTouches];
+    for (const touchList of touchLists) {
+        if (!touchList || touchList.length === 0) continue;
+        if (identifier == null) return touchList[0];
+        for (const touch of touchList) {
+            if (touch.identifier === identifier) return touch;
+        }
+    }
+    return null;
+}
+
+function getTrainerTouchMoveDistance(touchPoint, touchState) {
+    if (!touchPoint || !touchState) return Infinity;
+    const deltaX = touchPoint.clientX - touchState.startX;
+    const deltaY = touchPoint.clientY - touchState.startY;
+    return Math.hypot(deltaX, deltaY);
+}
+
+function handleTrainerCardTouchStart(event) {
+    const activeTab = document.querySelector('.view-section.active')?.id;
+    if (activeTab !== 'view-trainer') return;
+
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!canHandleTrainerCardTapTarget(targetEl)) {
+        trainerTouchTapState = null;
+        return;
+    }
+
+    const touchPoint = readTrainerTouchPoint(event);
+    if (!touchPoint) {
+        trainerTouchTapState = null;
+        return;
+    }
+
+    if (event.cancelable) event.preventDefault();
+    trainerTouchTapState = {
+        identifier: touchPoint.identifier,
+        startX: touchPoint.clientX,
+        startY: touchPoint.clientY,
+        moved: false
+    };
+}
+
+function handleTrainerCardTouchMove(event) {
+    if (!trainerTouchTapState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, trainerTouchTapState.identifier);
+    if (!touchPoint) return;
+
+    if (getTrainerTouchMoveDistance(touchPoint, trainerTouchTapState) > TRAINER_TOUCH_TAP_MAX_MOVE_PX) {
+        trainerTouchTapState.moved = true;
+    }
+}
+
+function handleTrainerCardTouchEnd(event) {
+    if (!trainerTouchTapState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, trainerTouchTapState.identifier);
+    const movedTooFar = !touchPoint || trainerTouchTapState.moved || getTrainerTouchMoveDistance(touchPoint, trainerTouchTapState) > TRAINER_TOUCH_TAP_MAX_MOVE_PX;
+    trainerTouchTapState = null;
+
+    if (movedTooFar) return;
+
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!canHandleTrainerCardTapTarget(targetEl)) return;
+
+    trainerTouchSuppressClickUntil = Date.now() + TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    handleTrainerTimerTap(event);
+}
+
+function handleTrainerCardTouchCancel() {
+    trainerTouchTapState = null;
+}
+
 function handleTrainerTimerTap(event) {
+    if (shouldSuppressTrainerGhostClick(event)) return true;
+
     if (event) {
-        event.preventDefault();
+        if (event.cancelable) event.preventDefault();
         event.stopPropagation();
     }
 
@@ -1940,12 +2285,12 @@ function handleTrainerTimerTap(event) {
 }
 
 function handleTrainerCardTap(event) {
+    if (shouldSuppressTrainerGhostClick(event)) return true;
+
     const targetEl = event?.target instanceof Element ? event.target : null;
     if (!targetEl) return false;
 
-    if (targetEl.closest('.trainer-panel')) return false;
-    if (targetEl.closest('#trainer-penalty-shell')) return false;
-    if (targetEl.closest('button, a, input, textarea, select, label')) return false;
+    if (!canHandleTrainerCardTapTarget(targetEl)) return false;
 
     return handleTrainerTimerTap(event);
 }
@@ -1956,8 +2301,11 @@ function resetTrainerView(options = {}) {
     trainerTimerState = 'idle';
     currentTrainerPair = null;
     currentTrainerScramble = '';
+    currentTrainerAlgorithm = '';
+    currentTrainerAlgorithmCycleLabel = '';
 
     setTrainerScrambleDisplay('');
+    updateTrainerTypeBadge();
 
     if (options.showNoScramble) {
         setTrainerStatus('trainer_status_no_scramble');
@@ -1984,13 +2332,13 @@ function generateTrainerScramble(options = {}) {
         return;
     }
 
-    const pairMovesMap = {};
+    const pairAlgorithmEntriesMap = {};
     const validPairs = [];
     result.pairs.forEach((pair) => {
         try {
-            const moves = getTrainerPairScrambleMoves(pair);
-            if (moves.length === 0) return;
-            pairMovesMap[pair] = moves;
+            const algorithmEntries = getTrainerPairAlgorithmEntries(pair);
+            if (algorithmEntries.length === 0) return;
+            pairAlgorithmEntriesMap[pair] = algorithmEntries;
             validPairs.push(pair);
         } catch (error) {
             // Ignore invalid algorithms so one bad entry does not block all scramble generation.
@@ -2004,7 +2352,8 @@ function generateTrainerScramble(options = {}) {
     }
 
     const pair = chooseTrainerPairFromPool(validPairs);
-    const scrambleMoves = buildRomanTrainerScrambleMoves(pairMovesMap[pair] || []);
+    const pickedAlgorithm = getTrainerPairMovesWithCycle(pair, pairAlgorithmEntriesMap[pair]);
+    const scrambleMoves = buildCubeSolverTrainerScrambleMoves(pickedAlgorithm?.moves || []);
 
     if (!scrambleMoves || scrambleMoves.length === 0) {
         resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
@@ -2012,8 +2361,13 @@ function generateTrainerScramble(options = {}) {
         return;
     }
 
+    currentTrainerAlgorithm = formatTrainerCommutatorText(pickedAlgorithm?.algorithm || '');
+    currentTrainerAlgorithmCycleLabel = String(pickedAlgorithm?.cycleLabel || '').trim();
     const nextScramble = scrambleMoves.join(' ');
-    rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType);
+    rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType, {
+        algorithm: currentTrainerAlgorithm,
+        cycleLabel: currentTrainerAlgorithmCycleLabel
+    });
     const navState = getTrainerScrambleNavState();
     applyTrainerScrambleSnapshot(navState.items[navState.index], {
         preserveStatus: options.preserveStatus === true
@@ -2455,6 +2809,7 @@ function switchTab(tab) {
     if (tab === currentTab) return;
 
     closeAllDropdowns();
+    setTrainerClearMenuOpen(false);
     const currentIndex = TAB_ORDER.indexOf(currentTab);
     const nextIndex = TAB_ORDER.indexOf(tab);
     const enterClass = nextIndex >= currentIndex ? 'tab-enter-forward' : 'tab-enter-backward';
@@ -2697,19 +3052,31 @@ function exportData() {
             });
         });
 
-        const blob = new Blob([JSON.stringify({
-            dict: cleanDict,
-            formulaDict: cleanCornerFormulaDict,
-            cornerFormulaDict: cleanCornerFormulaDict,
-            edgeFormulaDict: cleanEdgeFormulaDict,
-            status: cleanStatus,
-            formulaStatus: cleanCornerFormulaStatus,
-            cornerFormulaStatus: cleanCornerFormulaStatus,
-            edgeFormulaStatus: cleanEdgeFormulaStatus,
-            trainerRecords,
-            chars: chars,
-            lang: currentLang
-        })], { type: "application/json" });
+        const backupPayload = {
+            version: 2,
+            exportedAt: new Date().toISOString(),
+            sections: {
+                letterPairs: {
+                    word: cleanDict,
+                    corner: cleanCornerFormulaDict,
+                    edge: cleanEdgeFormulaDict
+                },
+                status: {
+                    word: cleanStatus,
+                    corner: cleanCornerFormulaStatus,
+                    edge: cleanEdgeFormulaStatus
+                },
+                trainer: {
+                    records: trainerRecords
+                },
+                settings: {
+                    chars: chars,
+                    lang: currentLang
+                }
+            }
+        };
+
+        const blob = new Blob([JSON.stringify(backupPayload)], { type: "application/json" });
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

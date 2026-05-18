@@ -463,6 +463,21 @@
             <div class="trainer-history-shell">
                 <div class="trainer-panel-label" data-i18n="trainer_history_label">History</div>
                 <div id="trainer-history" class="trainer-history-list"></div>
+                <div id="trainer-history-clear-group" class="trainer-history-clear-group">
+                    <button id="trainer-clear-menu-btn" class="action-btn trainer-history-clear-trigger"
+                        onclick="toggleTrainerClearMenu(event)" data-i18n="btn_clear_records"
+                        aria-haspopup="true" aria-expanded="false">Clear Records</button>
+                    <div id="trainer-clear-menu" class="trainer-history-clear-menu hidden">
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="requestClearTrainerRecords('corner')"
+                            data-i18n="btn_clear_corners_records">Delete Corners</button>
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="requestClearTrainerRecords('edge')"
+                            data-i18n="btn_clear_edges_records">Delete Edges</button>
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="setTrainerClearMenuOpen(false)" data-i18n="btn_delete_cancel">Cancel</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="view-data" class="view-section">
@@ -555,6 +570,8 @@
     </footer>
 
     <script src="built-in-algorithms.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.min.js"></script>
     <script src="script.js"></script>
 </body>
 

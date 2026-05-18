@@ -1858,6 +1858,7 @@ body::after {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    touch-action: manipulation;
 }
 
 #view-trainer .trainer-averages-shell,
@@ -2031,11 +2032,57 @@ body::after {
     letter-spacing: 0;
 }
 
+.trainer-history-clear-group {
+    position: relative;
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+}
+
+.trainer-history-clear-trigger {
+    margin: 0;
+    min-height: 36px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.trainer-history-clear-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    min-width: 178px;
+    max-width: min(320px, calc(100vw - 64px));
+    padding: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(226, 232, 240, 0.96);
+    background: #ffffff;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.trainer-history-clear-option {
+    width: 100%;
+    min-height: 38px;
+    margin: 0;
+    font-size: 0.82rem;
+}
+
 .trainer-history-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-top: 10px;
+    max-height: min(64vh, 760px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
 }
 
 .trainer-history-item {
@@ -2828,6 +2875,22 @@ body::after {
     .trainer-action-btn {
         flex: 1 1 96px;
         min-width: 0;
+    }
+
+    .trainer-history-clear-group {
+        width: 100%;
+    }
+
+    .trainer-history-clear-trigger {
+        width: 100%;
+    }
+
+    .trainer-history-clear-menu {
+        left: 0;
+        right: 0;
+        transform: none;
+        min-width: 0;
+        max-width: none;
     }
 
     .trainer-history-head {
