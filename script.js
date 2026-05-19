@@ -86,6 +86,7 @@ const TAB_SWIPE_DIRECTION_LOCK_PX = 14;
 let currentMatrixPair = null;
 let selectedMatrixPairs = new Set();
 let appInitCompleted = false;
+let bootTransitionCompleted = false;
 
 // --- 優化工具: 防抖函數 (Debounce) ---
 const debounce = (fn, delay = 500) => {
@@ -222,7 +223,7 @@ Object.assign(translations['zh-TW'], {
     alert_no_trainer_records_type: "\u76ee\u524d\u6c92\u6709 {type} \u7d00\u9304\u53ef\u522a\u9664\u3002",
     alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210\u6253\u4e82\u3002",
     btn_toggle_lang: "English / \u4e2d\u6587",
-    settings_chars_label: "\u4ee3\u78bc\u65b9\u6848",
+    settings_chars_label: "\u7de8\u78bc\u7cfb\u7d71",
     settings_chars_hint: "\u53ef\u7368\u7acb\u9078\u64c7\u6ce8\u97f3\uff08\u3105~\u3129\uff09\u3001\u82f1\u6587\uff08a~x\uff09\u6216\u81ea\u8a02\uff1b\u5207\u63db\u5230\u82f1\u6587\u4e0d\u6703\u8986\u84cb\u4f60\u7684\u81ea\u8a02\u3002",
     btn_chars_zh: "\u6ce8\u97f3 \u3105~\u3129",
     btn_chars_en: "English a~x",
@@ -292,7 +293,7 @@ Object.assign(translations.en, {
     alert_no_trainer_records_type: "No {type} records to delete.",
     alert_invalid_algorithm_format: "This algorithm format cannot be converted into a scramble yet.",
     btn_toggle_lang: "\u4e2d\u6587 / English",
-    settings_chars_label: "Lettering Codes",
+    settings_chars_label: "Lettering System",
     settings_chars_hint: "Choose Zhuyin (\u3105~\u3129), English (a~x), or Custom. Switching to English won't erase your custom scheme.",
     btn_chars_zh: "Zhuyin \u3105~\u3129",
     btn_chars_en: "English a~x",
@@ -596,6 +597,22 @@ function migrateLegacyFormulaData() {
     }
 }
 
+function completeBootTransition() {
+    if (bootTransitionCompleted) return;
+    bootTransitionCompleted = true;
+
+    const body = document.body;
+    const overlay = document.getElementById('boot-overlay');
+
+    if (body) body.classList.remove('app-booting');
+    if (!overlay) return;
+
+    overlay.classList.add('is-exiting');
+    window.setTimeout(() => {
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 380);
+}
+
 function init() {
     if (appInitCompleted) return;
 
@@ -614,6 +631,7 @@ function init() {
     renderTrainerRecords();
     generateTrainerScramble({ silent: true });
     appInitCompleted = true;
+    completeBootTransition();
 }
 
 function bootApp() {
@@ -632,6 +650,7 @@ function bootApp() {
             init();
         } catch (retryError) {
             console.error('App initialization retry failed:', retryError);
+            completeBootTransition();
         }
     }
 }
@@ -2955,9 +2974,6 @@ function applyLanguage() {
     renderTrainerRecords();
     toggleViewMode(currentListViewMode);
 }
-
-window.setCharScheme = setCharScheme;
-window.bootApp = bootApp;
 
 function setMemoryCardFlipped(isFlipped) {
     const memoryCard = document.getElementById('memory-card');
