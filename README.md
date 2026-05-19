@@ -17,8 +17,10 @@ You can use it to:
 - store `Words` for letter pairs
 - review `Corners` algorithms
 - review `Edges` algorithms
+- train with `3-Style Trainer` (scramble + timer + history)
 - practice with flashcards
 - train recall speed with typing tests
+- switch lettering codes between `Zhuyin`, `English`, and `Custom`
 - export and import your own local data
 
 It is a fully static website with no backend required.
@@ -51,14 +53,22 @@ If you use a different lettering scheme, you can directly edit the row and colum
 - directly edit table headers to use your own lettering scheme
 - use familiarity colors for quick review management
 
-### 2. Built-in Algorithm References
+### 2. 3-Style Trainer
+
+- generate corner/edge scrambles with built-in algorithm data
+- auto-generate a scramble when entering the trainer page
+- switch between `Corners` and `Edges` sessions
+- keep per-type history, penalties (`+2`, `DNF`), and averages (`ao5`, `ao12`, `ao50`, `ao100`)
+- supports swipe tab switching on touch devices (left/right)
+
+### 3. Built-in Algorithm References
 
 - built-in defaults are derived from `BLDDB`
 - no runtime fetch is required
 - empty algorithm fields can show built-in placeholders
 - corner and edge algorithms can be reviewed separately in flashcards
 
-### 3. Flashcards
+### 4. Flashcards
 
 - practice `Words`, `Corners`, and `Edges`
 - review due cards with spaced-repetition style scheduling
@@ -71,13 +81,20 @@ Review timing:
 - `Slow`: due again in 6 hours
 - `Good`: scheduled with day-based spacing
 
-### 4. Typing Test
+### 5. Typing Test
 
 - practice `Words` with a timer
 - filter by start and end ranges
 - test results update the same familiarity and scheduling data
 
-### 5. Backup and Restore
+### 6. Settings, Language, and Lettering Codes
+
+- bilingual interface (`Traditional Chinese` / `English`)
+- quick language toggle in `Setting`
+- lettering code presets: `Zhuyin ㄅ~ㄩ`, `English a~x`, and `Custom`
+- switching presets does not erase your saved custom scheme
+
+### 7. Backup and Restore
 
 - export a full `.json` backup
 - export the word table as `.csv`
@@ -107,6 +124,12 @@ Backup data includes:
 - all user data is stored in browser `localStorage`
 - clearing browser site data will remove local progress if you do not have a backup
 - built-in algorithm defaults are loaded from `built-in-algorithms.js`
+
+## Troubleshooting
+
+- If you pushed updates but still see an old UI, hard refresh: `Ctrl+F5` (Windows) or `Cmd+Shift+R` (macOS).
+- GitHub Pages static assets are cached for a short time (`Cache-Control: max-age=600`), so old/new CSS/JS can briefly mix.
+- If needed, open the site in private mode or clear site data for `charlesouo.github.io`.
 
 ## Deployment
 
@@ -154,8 +177,10 @@ This project is licensed under `GPL-3.0-or-later`.
 - 紀錄 letter pairs 的 `Words`
 - 複習 `Corners` 公式
 - 複習 `Edges` 公式
+- 使用 `3-Style Trainer` 練習（打亂、計時、紀錄）
 - 使用字卡練習
 - 使用打字測驗訓練反應速度
+- 可在 `注音`、`英文`、`自訂` 代碼方案間切換
 - 匯出與匯入自己的本機資料
 
 這是一個純靜態網站，不需要後端。
@@ -188,14 +213,22 @@ This project is licensed under `GPL-3.0-or-later`.
 - 可直接修改表頭，改成自己的 lettering scheme
 - 可搭配熟悉度顏色做快速管理
 
-### 2. 內建公式參考
+### 2. 3-Style Trainer
+
+- 可依內建公式資料產生 corners/edges 打亂
+- 切到 Trainer 頁面會自動產生一組打亂
+- 可切換 `Corners` / `Edges` 練習類型
+- 支援每種類型的歷史紀錄、`+2`、`DNF` 與平均（`ao5`、`ao12`、`ao50`、`ao100`）
+- 行動裝置可左右滑動切換頁籤
+
+### 3. 內建公式參考
 
 - 內建預設公式根據 `BLDDB` 資料整理
 - 不需要在執行時另外抓取資料
 - 當公式欄位為空時，可以顯示內建 placeholder
 - corners 與 edges 可以分開在字卡中複習
 
-### 3. Flashcards
+### 4. Flashcards
 
 - 可練習 `Words`、`Corners`、`Edges`
 - 使用類 spaced repetition 的到期排程
@@ -208,13 +241,20 @@ This project is licensed under `GPL-3.0-or-later`.
 - `Slow`：6 小時後再次到期
 - `Good`：依天數間隔排程
 
-### 4. Typing Test
+### 5. Typing Test
 
 - 使用計時器練習 `Words`
 - 可依開頭與結尾範圍過濾
 - 測驗結果會更新同一套熟悉度與排程資料
 
-### 5. 備份與還原
+### 6. 設定、語言與代碼方案
+
+- 介面支援 `繁中` / `English`
+- 可在 `Setting` 快速切換語言
+- 代碼方案可在 `注音 ㄅ~ㄩ`、`English a~x`、`自訂` 間切換
+- 切換預設不會清掉已儲存的自訂方案
+
+### 7. 備份與還原
 
 - 可匯出完整 `.json` 備份
 - 可匯出 `Words` 表格為 `.csv`
@@ -244,6 +284,12 @@ This project is licensed under `GPL-3.0-or-later`.
 - 所有使用者資料都存放在瀏覽器 `localStorage`
 - 如果沒有先備份，清除瀏覽器站點資料後，本機進度會消失
 - 內建公式預設由 `built-in-algorithms.js` 提供
+
+## 疑難排解
+
+- 如果已經 push 但畫面還是舊版，請先強制重新整理：`Ctrl+F5`（Windows）或 `Cmd+Shift+R`（macOS）。
+- GitHub Pages 靜態資源有短暫快取（`Cache-Control: max-age=600`），短時間內可能出現新舊 CSS/JS 混用。
+- 必要時可用無痕模式開啟，或清除 `charlesouo.github.io` 站點資料。
 
 ## 部署方式
 

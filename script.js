@@ -85,6 +85,7 @@ const TAB_SWIPE_DIRECTION_LOCK_PX = 14;
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
 let selectedMatrixPairs = new Set();
+let appInitCompleted = false;
 
 // --- 優化工具: 防抖函數 (Debounce) ---
 const debounce = (fn, delay = 500) => {
@@ -100,6 +101,20 @@ const savePairDataDebounced = debounce((pair, value, contentMode = 'word') => {
     d[pair] = value.trim();
     saveContentDict(contentMode, d);
 }, 500);
+
+function readStoredJson(key, fallbackValue) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallbackValue;
+
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed ?? fallbackValue;
+    } catch (error) {
+        // Prevent one malformed localStorage entry from breaking app boot.
+        localStorage.removeItem(key);
+        return fallbackValue;
+    }
+}
 
 const translations = {
     'zh-TW': {
@@ -120,7 +135,7 @@ const translations = {
         settings_formula_title: "公式預設",
         settings_formula_prefix: "公式預設來源為 ",
         settings_formula_suffix: "，預設使用 Speffz lettering scheme。",
-        settings_language_label: "Language",
+        settings_language_label: "語言",
         settings_language_hint: "可在中文與 English 之間切換介面語言。"
     },
     'en': {
@@ -337,7 +352,7 @@ function calculateNextReview(currentData, grade) {
 }
 
 function getStatusMap(contentMode = 'word') {
-    return JSON.parse(localStorage.getItem(getStatusStorageKey(contentMode))) || {};
+    return readStoredJson(getStatusStorageKey(contentMode), {});
 }
 function shouldDefaultHidePair(pair, contentMode = 'word') {
     if (!isAlgorithmContentMode(contentMode)) return false;
@@ -367,9 +382,9 @@ function saveStatusData(pair, dataObject, contentMode = 'word') {
 function getPairColor(pair, contentMode = 'word') { const data = getPairData(pair, contentMode); return data ? (data.color || 'red') : ''; }
 
 function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
-function getDict() { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+function getDict() { return readStoredJson(STORAGE_KEY, {}); }
 function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
-function getFormulaDict(formulaType = 'corner') { return JSON.parse(localStorage.getItem(getContentStorageKey(formulaType))) || {}; }
+function getFormulaDict(formulaType = 'corner') { return readStoredJson(getContentStorageKey(formulaType), {}); }
 function saveFormulaDict(formulaType = 'corner', dict) { localStorage.setItem(getContentStorageKey(formulaType), JSON.stringify(dict)); }
 function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : getDict(); }
 function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : saveDict(dict); }
@@ -516,11 +531,7 @@ function clearAppStorageData() {
 }
 
 function getTrainerRecords() {
-    try {
-        return sanitizeTrainerRecords(JSON.parse(localStorage.getItem(TRAINER_RECORDS_KEY)) || []);
-    } catch (error) {
-        return [];
-    }
+    return sanitizeTrainerRecords(readStoredJson(TRAINER_RECORDS_KEY, []));
 }
 
 function normalizeTrainerAlgorithmType(type = 'corner') {
@@ -574,8 +585,8 @@ function saveTrainerRecords(records) {
 function migrateLegacyFormulaData() {
     const hasCornerFormula = !!localStorage.getItem(CORNER_FORMULA_STORAGE_KEY);
     const hasCornerStatus = !!localStorage.getItem(CORNER_FORMULA_STATUS_KEY);
-    const legacyFormula = JSON.parse(localStorage.getItem(LEGACY_FORMULA_STORAGE_KEY)) || {};
-    const legacyStatus = JSON.parse(localStorage.getItem(LEGACY_FORMULA_STATUS_KEY)) || {};
+    const legacyFormula = readStoredJson(LEGACY_FORMULA_STORAGE_KEY, {});
+    const legacyStatus = readStoredJson(LEGACY_FORMULA_STATUS_KEY, {});
 
     if (!hasCornerFormula && Object.keys(legacyFormula).length > 0) {
         localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(legacyFormula));
@@ -586,8 +597,10 @@ function migrateLegacyFormulaData() {
 }
 
 function init() {
-    const savedChars = localStorage.getItem(CHARS_KEY);
-    if (savedChars) chars = JSON.parse(savedChars);
+    if (appInitCompleted) return;
+
+    const savedChars = sanitizeChars(readStoredJson(CHARS_KEY, null));
+    if (savedChars) chars = savedChars;
     if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
     trainerRecords = getTrainerRecords();
     syncLatestTrainerRecordId();
@@ -600,6 +613,27 @@ function init() {
     updateTrainerAlgorithmButtons();
     renderTrainerRecords();
     generateTrainerScramble({ silent: true });
+    appInitCompleted = true;
+}
+
+function bootApp() {
+    if (appInitCompleted) return;
+
+    try {
+        init();
+    } catch (error) {
+        console.error('App initialization failed:', error);
+        // Keep the app recoverable instead of showing an uninitialized static shell forever.
+        appInitCompleted = false;
+
+        try {
+            chars = [...CHARS_ZH];
+            currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
+            init();
+        } catch (retryError) {
+            console.error('App initialization retry failed:', retryError);
+        }
+    }
 }
 
 function setupEventListeners() {
@@ -718,7 +752,10 @@ function updateLayoutMode() {
 }
 
 function initUI() {
-    const listSel = document.getElementById('char-select'); listSel.innerHTML = '';
+    const listSel = document.getElementById('char-select');
+    if (!listSel) return;
+
+    listSel.innerHTML = '';
     chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c.toUpperCase()}`; listSel.appendChild(opt1); });
 
     // Init checkboxes for Start/End in Memory and Trainer
@@ -2827,13 +2864,9 @@ function getCurrentCharScheme() {
 }
 
 function getSavedCustomChars() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(CUSTOM_CHARS_KEY));
-        const normalized = sanitizeChars(saved);
-        return normalized ? normalized : null;
-    } catch (error) {
-        return null;
-    }
+    const saved = readStoredJson(CUSTOM_CHARS_KEY, null);
+    const normalized = sanitizeChars(saved);
+    return normalized ? normalized : null;
 }
 
 function saveCustomChars(nextChars = chars) {
@@ -2903,9 +2936,13 @@ function applyLanguage() {
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); if (translations[currentLang][key]) el.placeholder = translations[currentLang][key]; });
     document.documentElement.lang = currentLang === 'zh-TW' ? 'zh-TW' : 'en';
     document.title = t('page_title');
-    const listSel = document.getElementById('char-select'); const currentVal = listSel.value; listSel.innerHTML = '';
-    chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
-    if (currentVal && chars.includes(currentVal)) listSel.value = currentVal;
+    const listSel = document.getElementById('char-select');
+    if (listSel) {
+        const currentVal = listSel.value;
+        listSel.innerHTML = '';
+        chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
+        if (currentVal && chars.includes(currentVal)) listSel.value = currentVal;
+    }
     setMemoryCardFlipped(isMemAnswerShown);
     updateDropdownLabel('mem_start'); updateDropdownLabel('mem_end');
     updateDropdownLabel('trainer_start'); updateDropdownLabel('trainer_end');
@@ -2920,6 +2957,7 @@ function applyLanguage() {
 }
 
 window.setCharScheme = setCharScheme;
+window.bootApp = bootApp;
 
 function setMemoryCardFlipped(isFlipped) {
     const memoryCard = document.getElementById('memory-card');
@@ -3361,5 +3399,13 @@ function clearAllData() {
     if (confirm(t('alert_reset'))) {
         clearAppStorageData();
         location.reload();
+    }
+}
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootApp, { once: true });
+    } else {
+        bootApp();
     }
 }

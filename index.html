@@ -7,7 +7,10 @@
     <meta name="description"
         content="3BLD(3 style & letter pairs) practice with words, corners, edges, flashcards, typing tests, and local backup.">
     <title data-i18n="page_title">3BLD(3 style & letter pairs) practice</title>
-    <link rel="stylesheet" href="style.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="style.css?v=20260519b">
 
     <style media="not all" data-legacy-inline-styles="true">
         /* =========================================
@@ -231,7 +234,7 @@
     </style>
 </head>
 
-<body onload="init()">
+<body onload="window.bootApp ? window.bootApp() : (window.init && window.init())">
     <div class="nav-bar">
         <div class="nav-container">
             <button class="nav-btn active" onclick="switchTab('list')" data-i18n="nav_list">列表輸入</button>
@@ -582,10 +585,10 @@
         <div class="footer-meta">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
     </footer>
 
-    <script src="built-in-algorithms.js"></script>
+    <script src="built-in-algorithms.js?v=20260519b"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=20260519b"></script>
 </body>
 
 </html>
