@@ -1904,7 +1904,7 @@ body::after {
 .trainer-status {
     min-height: 20px;
     color: #475569;
-    font-size: 1rem;
+    font-size: 24px;
     font-weight: 700;
     text-align: center;
 }

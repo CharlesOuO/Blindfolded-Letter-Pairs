@@ -40,8 +40,6 @@ let currentTrainerAlgorithmType = 'corner';
 let currentTrainerPair = null;
 let currentTrainerScramble = '';
 let currentTrainerAlgorithm = '';
-let currentTrainerAlgorithmCycleLabel = '';
-let lastTrainerPair = null;
 let trainerRecords = [];
 let latestTrainerRecordId = null;
 let trainerTimerState = 'idle';
@@ -63,6 +61,10 @@ let trainerScrambleNavigation = {
 let trainerAlgorithmDrawState = {
     corner: {},
     edge: {}
+};
+let trainerPairDrawState = {
+    corner: { signature: '', total: 0, drawOrder: [] },
+    edge: { signature: '', total: 0, drawOrder: [] }
 };
 let currentTab = 'list';
 const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
@@ -139,7 +141,7 @@ const translations = {
 };
 
 Object.assign(translations['zh-TW'], {
-    nav_trainer: "3-Style Trainer",
+    nav_trainer: "3-Style 訓練",
     mode_formula: "\u516c\u5f0f\u6a21\u5f0f",
     mode_formula_matrix: "\u516c\u5f0f\u8868\u683c",
     group_words: "\u5b57\u8a5e",
@@ -151,27 +153,27 @@ Object.assign(translations['zh-TW'], {
     switch_words: "\u5b57\u8a5e",
     switch_algorithm: "\u516c\u5f0f",
     algorithm_type: "\u516c\u5f0f\u985e\u578b",
-    algorithm_corners: "Corners",
-    algorithm_edges: "Edges",
+    algorithm_corners: "角塊",
+    algorithm_edges: "邊塊",
     content_word_label: "\u5b57\u8a5e",
     content_formula_label: "\u516c\u5f0f",
-    content_corner_label: "Corners",
-    content_edge_label: "Edges",
+    content_corner_label: "角塊",
+    content_edge_label: "邊塊",
     study_word_mode: "\u5b57\u8a5e\u6a21\u5f0f",
     study_formula_mode: "\u516c\u5f0f\u6a21\u5f0f",
-    study_corner_mode: "Corners",
-    study_edge_mode: "Edges",
+    study_corner_mode: "角塊模式",
+    study_edge_mode: "邊塊模式",
     ph_formula: "\u8f38\u5165\u516c\u5f0f",
     ph_algorithm: "\u8f38\u5165\u516c\u5f0f",
-    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44 letter pair \u8f38\u5165 corners \u6216 edges \u516c\u5f0f\uff0c\u7a7a\u767d\u6642\u6703\u986f\u793a\u5167\u5efa BLDDB \u9810\u8a2d commutator\uff0cFlashcards \u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
+    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44\u5b57\u6bcd\u5c0d\u8f38\u5165\u89d2\u584a\u6216\u908a\u584a\u516c\u5f0f\uff0c\u7a7a\u767d\u6642\u6703\u986f\u793a\u5167\u5efa BLDDB \u9810\u8a2d\u4ea4\u63db\u5b50\uff0c\u7ffb\u724c\u6a21\u5f0f\u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
     alert_no_formula_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u516c\u5f0f\u8cc7\u6599\uff01",
-    alert_no_algorithm_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709 corners \u6216 edges \u516c\u5f0f\u8cc7\u6599\uff01",
+    alert_no_algorithm_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u89d2\u584a\u6216\u908a\u584a\u516c\u5f0f\u8cc7\u6599\uff01",
     alert_select_matrix_cells: "\u8acb\u5148\u9ede\u9078\u77e9\u9663\u4e2d\u7684\u683c\u5b50\uff01",
     msg_matrix_updated: "\u5df2\u66f4\u65b0\uff01",
-    confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210 English a-x \u4ee3\u78bc\u55ce\uff1f",
+    confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210\u82f1\u6587 a-x \u4ee3\u78bc\u55ce\uff1f",
     confirm_switch_chars_zh: "\u8981\u5207\u56de\u6ce8\u97f3\u4ee3\u78bc\u55ce\uff1f",
-    trainer_scramble_label: "Scramble",
-    trainer_scramble_placeholder: "\u6309\u4e0b\u300c\u7522\u751f\u4e0b\u4e00\u7d44 Scramble\u300d\u958b\u59cb\u3002",
+    trainer_scramble_label: "\u6253\u4e82",
+    trainer_scramble_placeholder: "\u6309\u4e0b\u300c\u7522\u751f\u4e0b\u4e00\u7d44\u6253\u4e82\u300d\u958b\u59cb\u3002",
     trainer_scramble_hint: "\u6253\u4e82\u5b8c\u6210\u5f8c\u6309\u4e00\u4e0b\u7a7a\u767d\u9375\u958b\u59cb\u8a08\u6642\uff0c\u4efb\u610f\u9375\u505c\u6b62\u3002",
     trainer_status_idle: "\u6309\u4e00\u4e0b\u7a7a\u767d\u9375\u958b\u59cb",
     trainer_status_holding: "\u7e7c\u7e8c\u6309\u4f4f\u2026",
@@ -179,9 +181,9 @@ Object.assign(translations['zh-TW'], {
     trainer_status_running: "\u8a08\u6642\u4e2d",
     trainer_status_stopped: "\u5df2\u8a18\u9304\u9019\u6b21\u6210\u7e3e\uff0c\u53ef\u4ee5\u9078\u64c7 +2\u3001DNF \u6216\u522a\u9664\u3002",
     trainer_status_delete_confirm: "\u518d\u6309\u4e00\u6b21\u300c\u78ba\u8a8d\u300d\u624d\u6703\u522a\u9664\u6700\u8fd1\u4e00\u6b21\u6210\u7e3e\u3002",
-    trainer_status_no_scramble: "\u76ee\u524d\u7bc4\u570d\u6c92\u6709\u53ef\u7528\u7684 scramble\u3002",
-    btn_generate_scramble: "\u7522\u751f\u4e0b\u4e00\u7d44 Scramble",
-    btn_prev_scramble: "\u4e0a\u4e00\u7d44 Scramble",
+    trainer_status_no_scramble: "\u76ee\u524d\u7bc4\u570d\u6c92\u6709\u53ef\u7528\u7684\u6253\u4e82\u3002",
+    btn_generate_scramble: "\u7522\u751f\u4e0b\u4e00\u7d44\u6253\u4e82",
+    btn_prev_scramble: "\u4e0a\u4e00\u7d44\u6253\u4e82",
     btn_penalty_plus2: "+2",
     btn_penalty_dnf: "DNF",
     btn_delete_solve: "\u522a\u9664",
@@ -193,13 +195,13 @@ Object.assign(translations['zh-TW'], {
     trainer_solution_label: "\u89e3\u6cd5",
     trainer_history_empty: "\u9084\u6c92\u6709\u8a08\u6642\u7d00\u9304",
     btn_clear_records: "\u6e05\u9664\u7d00\u9304",
-    btn_clear_corners_records: "\u522a\u9664 Corners",
-    btn_clear_edges_records: "\u522a\u9664 Edges",
+    btn_clear_corners_records: "\u522a\u9664\u89d2\u584a",
+    btn_clear_edges_records: "\u522a\u9664\u908a\u584a",
     confirm_clear_trainer_records: "\u78ba\u5b9a\u8981\u522a\u9664\u6240\u6709 {type} \u7d00\u9304\uff08\u5171 {count} \u7b46\uff09\u55ce\uff1f\u6b64\u52d5\u4f5c\u7121\u6cd5\u5fa9\u539f\u3002",
     alert_no_trainer_records_type: "\u76ee\u524d\u6c92\u6709 {type} \u7d00\u9304\u53ef\u522a\u9664\u3002",
-    alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210 scramble\u3002",
+    alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210\u6253\u4e82\u3002",
     btn_toggle_lang: "English / \u4e2d\u6587",
-    page_title: "3BLD(3 style & letter pairs) practice",
+    page_title: "3BLD 3-Style Letter Pairs \u7df4\u7fd2",
     sel_prefix: "\u5df2\u9078\uff1a"
 });
 
@@ -531,6 +533,10 @@ function resetTrainerScrambleNavigation() {
     trainerAlgorithmDrawState = {
         corner: {},
         edge: {}
+    };
+    trainerPairDrawState = {
+        corner: { signature: '', total: 0, drawOrder: [] },
+        edge: { signature: '', total: 0, drawOrder: [] }
     };
     updateTrainerScrambleNavButtons();
 }
@@ -1270,8 +1276,7 @@ function updateTrainerAlgorithmButtons() {
 
 function updateTrainerTypeBadge() {
     const modeLabel = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
-    const progressLabel = currentTrainerAlgorithmCycleLabel ? ` | ${currentTrainerAlgorithmCycleLabel}` : '';
-    const displayText = `${modeLabel}${progressLabel}`;
+    const displayText = modeLabel;
     const badge = document.getElementById('trainer-type-badge');
     const statusEl = document.getElementById('trainer-status');
     if (badge) badge.innerText = displayText;
@@ -1306,7 +1311,6 @@ function toggleMemoryContentMode(mode) {
 function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
     currentTrainerAlgorithm = '';
-    currentTrainerAlgorithmCycleLabel = '';
     clearTrainerInlineStates();
     updateTrainerAlgorithmButtons();
     updateTrainerTypeBadge();
@@ -1398,25 +1402,19 @@ function chooseTrainerAlgorithmFromPool(pair, algorithmEntries = []) {
         state = {
             signature,
             total: algorithmEntries.length,
-            drawOrder: [],
-            cycleDrawCount: 0
+            drawOrder: []
         };
         store[pair] = state;
     }
 
     if (state.drawOrder.length === 0) {
         state.drawOrder = shuffleTrainerArray(algorithmEntries.map((_, index) => index));
-        state.cycleDrawCount = 0;
     }
 
     const nextIndex = state.drawOrder.pop();
     if (!Number.isInteger(nextIndex) || !algorithmEntries[nextIndex]) return null;
 
-    state.cycleDrawCount += 1;
-    return {
-        ...algorithmEntries[nextIndex],
-        cycleLabel: `C${state.cycleDrawCount}/${algorithmEntries.length}`
-    };
+    return { ...algorithmEntries[nextIndex] };
 }
 
 function getTrainerPairAlgorithmEntries(pair) {
@@ -1481,13 +1479,33 @@ function getTrainerRecordAlgorithmText(record) {
     return formatTrainerCommutatorText(fallbackAlgorithm);
 }
 
-function chooseTrainerPairFromPool(pool) {
-    let nextPool = [...pool];
-    if (nextPool.length > 1 && lastTrainerPair) {
-        const filteredPool = nextPool.filter((pair) => pair !== lastTrainerPair);
-        if (filteredPool.length > 0) nextPool = filteredPool;
+function buildTrainerPairCycleSignature(pool = []) {
+    return pool.join('\u241E');
+}
+
+function chooseTrainerPairFromPool(pool, type = currentTrainerAlgorithmType) {
+    if (!Array.isArray(pool) || pool.length === 0) return null;
+
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerPairDrawState[algorithmType]) {
+        trainerPairDrawState[algorithmType] = { signature: '', total: 0, drawOrder: [] };
     }
-    return nextPool[Math.floor(Math.random() * nextPool.length)];
+
+    const state = trainerPairDrawState[algorithmType];
+    const signature = buildTrainerPairCycleSignature(pool);
+    if (state.signature !== signature || state.total !== pool.length) {
+        state.signature = signature;
+        state.total = pool.length;
+        state.drawOrder = [];
+    }
+
+    if (state.drawOrder.length === 0) {
+        state.drawOrder = shuffleTrainerArray(pool.map((_, index) => index));
+    }
+
+    const nextIndex = state.drawOrder.pop();
+    if (!Number.isInteger(nextIndex) || !pool[nextIndex]) return pool[0];
+    return pool[nextIndex];
 }
 
 function getTrainerScrambleNavState(type = currentTrainerAlgorithmType) {
@@ -1518,8 +1536,6 @@ function applyTrainerScrambleSnapshot(snapshot, options = {}) {
     currentTrainerPair = snapshot.pair || null;
     currentTrainerScramble = snapshot.scramble;
     currentTrainerAlgorithm = formatTrainerCommutatorText(snapshot.algorithm || '');
-    currentTrainerAlgorithmCycleLabel = String(snapshot.cycleLabel || '').trim();
-    lastTrainerPair = snapshot.pair || null;
 
     setTrainerScrambleDisplay(currentTrainerScramble);
     updateTrainerTypeBadge();
@@ -1541,7 +1557,6 @@ function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAl
         pair,
         scramble,
         algorithm: formatTrainerCommutatorText(options.algorithm || ''),
-        cycleLabel: String(options.cycleLabel || '').trim(),
         algorithmType: normalizeTrainerAlgorithmType(type)
     });
 
@@ -2302,7 +2317,6 @@ function resetTrainerView(options = {}) {
     currentTrainerPair = null;
     currentTrainerScramble = '';
     currentTrainerAlgorithm = '';
-    currentTrainerAlgorithmCycleLabel = '';
 
     setTrainerScrambleDisplay('');
     updateTrainerTypeBadge();
@@ -2351,7 +2365,7 @@ function generateTrainerScramble(options = {}) {
         return;
     }
 
-    const pair = chooseTrainerPairFromPool(validPairs);
+    const pair = chooseTrainerPairFromPool(validPairs, currentTrainerAlgorithmType);
     const pickedAlgorithm = getTrainerPairMovesWithCycle(pair, pairAlgorithmEntriesMap[pair]);
     const scrambleMoves = buildCubeSolverTrainerScrambleMoves(pickedAlgorithm?.moves || []);
 
@@ -2362,11 +2376,9 @@ function generateTrainerScramble(options = {}) {
     }
 
     currentTrainerAlgorithm = formatTrainerCommutatorText(pickedAlgorithm?.algorithm || '');
-    currentTrainerAlgorithmCycleLabel = String(pickedAlgorithm?.cycleLabel || '').trim();
     const nextScramble = scrambleMoves.join(' ');
     rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType, {
-        algorithm: currentTrainerAlgorithm,
-        cycleLabel: currentTrainerAlgorithmCycleLabel
+        algorithm: currentTrainerAlgorithm
     });
     const navState = getTrainerScrambleNavState();
     applyTrainerScrambleSnapshot(navState.items[navState.index], {
