@@ -12,6 +12,7 @@ const CORNER_FORMULA_STATUS_KEY = 'bld_formula_corner_status_v1';
 const EDGE_FORMULA_STATUS_KEY = 'bld_formula_edge_status_v1';
 const LANG_KEY = 'bld_lang_v1';
 const CHARS_KEY = 'bld_chars_v1';
+const CUSTOM_CHARS_KEY = 'bld_custom_chars_v1';
 const TRAINER_RECORDS_KEY = 'bld_trainer_records_v1';
 const APP_STORAGE_KEYS = [
     STORAGE_KEY,
@@ -24,6 +25,7 @@ const APP_STORAGE_KEYS = [
     EDGE_FORMULA_STATUS_KEY,
     LANG_KEY,
     CHARS_KEY,
+    CUSTOM_CHARS_KEY,
     TRAINER_RECORDS_KEY
 ];
 
@@ -54,6 +56,7 @@ let trainerClearMenuOpen = false;
 let trainerCubeSolverInitState = 'unknown';
 let trainerTouchTapState = null;
 let trainerTouchSuppressClickUntil = 0;
+let tabSwipeState = null;
 let trainerScrambleNavigation = {
     corner: { items: [], index: -1 },
     edge: { items: [], index: -1 }
@@ -75,6 +78,9 @@ const TRAINER_SCRAMBLE_HISTORY_LIMIT = 200;
 const TRAINER_CUBE_SOLVER_MAX_DEPTH = 22;
 const TRAINER_TOUCH_TAP_MAX_MOVE_PX = 14;
 const TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS = 700;
+const TAB_SWIPE_MIN_DISTANCE_PX = 72;
+const TAB_SWIPE_DIRECTION_RATIO = 1.2;
+const TAB_SWIPE_DIRECTION_LOCK_PX = 14;
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -201,6 +207,11 @@ Object.assign(translations['zh-TW'], {
     alert_no_trainer_records_type: "\u76ee\u524d\u6c92\u6709 {type} \u7d00\u9304\u53ef\u522a\u9664\u3002",
     alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210\u6253\u4e82\u3002",
     btn_toggle_lang: "English / \u4e2d\u6587",
+    settings_chars_label: "\u4ee3\u78bc\u65b9\u6848",
+    settings_chars_hint: "\u53ef\u7368\u7acb\u9078\u64c7\u6ce8\u97f3\uff08\u3105~\u3129\uff09\u3001\u82f1\u6587\uff08a~x\uff09\u6216\u81ea\u8a02\uff1b\u5207\u63db\u5230\u82f1\u6587\u4e0d\u6703\u8986\u84cb\u4f60\u7684\u81ea\u8a02\u3002",
+    btn_chars_zh: "\u6ce8\u97f3 \u3105~\u3129",
+    btn_chars_en: "English a~x",
+    btn_chars_custom: "\u81ea\u8a02",
     page_title: "3BLD 3-Style Letter Pairs \u7df4\u7fd2",
     sel_prefix: "\u5df2\u9078\uff1a"
 });
@@ -266,6 +277,11 @@ Object.assign(translations.en, {
     alert_no_trainer_records_type: "No {type} records to delete.",
     alert_invalid_algorithm_format: "This algorithm format cannot be converted into a scramble yet.",
     btn_toggle_lang: "\u4e2d\u6587 / English",
+    settings_chars_label: "Lettering Codes",
+    settings_chars_hint: "Choose Zhuyin (\u3105~\u3129), English (a~x), or Custom. Switching to English won't erase your custom scheme.",
+    btn_chars_zh: "Zhuyin \u3105~\u3129",
+    btn_chars_en: "English a~x",
+    btn_chars_custom: "Custom",
     page_title: "3BLD(3 style & letter pairs) practice"
 });
 
@@ -572,6 +588,7 @@ function migrateLegacyFormulaData() {
 function init() {
     const savedChars = localStorage.getItem(CHARS_KEY);
     if (savedChars) chars = JSON.parse(savedChars);
+    if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
     trainerRecords = getTrainerRecords();
     syncLatestTrainerRecordId();
     resetTrainerScrambleNavigation();
@@ -633,6 +650,13 @@ function setupEventListeners() {
         trainerCardEl.addEventListener('touchmove', handleTrainerCardTouchMove, { passive: true });
         trainerCardEl.addEventListener('touchend', handleTrainerCardTouchEnd, { passive: false });
         trainerCardEl.addEventListener('touchcancel', handleTrainerCardTouchCancel, { passive: true });
+    }
+    const mainContainerEl = document.getElementById('main-container');
+    if (mainContainerEl) {
+        mainContainerEl.addEventListener('touchstart', handleTabSwipeTouchStart, { passive: true });
+        mainContainerEl.addEventListener('touchmove', handleTabSwipeTouchMove, { passive: false });
+        mainContainerEl.addEventListener('touchend', handleTabSwipeTouchEnd, { passive: true });
+        mainContainerEl.addEventListener('touchcancel', handleTabSwipeTouchCancel, { passive: true });
     }
 
     const listContainer = document.getElementById('grid-area');
@@ -819,6 +843,13 @@ function setupDynamicUI() {
     if (memoryPanel && !document.getElementById('btn-mem-content-word')) {
         const modeRow = document.createElement('div');
         modeRow.className = 'control-row control-row-wrap memory-mode-row';
+        modeRow.id = 'memory-mode-row';
+
+        const leftGroup = document.createElement('div');
+        leftGroup.className = 'memory-mode-group memory-mode-group-left';
+
+        const rightGroup = document.createElement('div');
+        rightGroup.className = 'memory-mode-group memory-mode-group-right';
 
         const wordButton = document.createElement('button');
         wordButton.id = 'btn-mem-content-word';
@@ -841,10 +872,16 @@ function setupDynamicUI() {
         edgeButton.setAttribute('data-i18n', 'study_edge_mode');
         edgeButton.innerText = t('study_edge_mode');
 
-        modeRow.appendChild(wordButton);
-        modeRow.appendChild(cornerButton);
-        modeRow.appendChild(edgeButton);
-        memoryPanel.insertBefore(modeRow, memoryPanel.firstElementChild);
+        leftGroup.appendChild(wordButton);
+        leftGroup.appendChild(cornerButton);
+        rightGroup.appendChild(edgeButton);
+
+        modeRow.appendChild(leftGroup);
+        modeRow.appendChild(rightGroup);
+
+        const rangeRow = memoryPanel.querySelector('.control-row');
+        if (rangeRow) rangeRow.insertAdjacentElement('afterend', modeRow);
+        else memoryPanel.insertBefore(modeRow, memoryPanel.firstElementChild);
     }
 }
 
@@ -2207,6 +2244,107 @@ function readTrainerTouchPoint(event, identifier = null) {
     return null;
 }
 
+function canHandleTabSwipeTarget(targetEl) {
+    if (!(targetEl instanceof Element)) return false;
+    if (targetEl.closest('button, a, input, textarea, select, label, [contenteditable], [role="button"]')) return false;
+    if (targetEl.closest('.dropdown-content, .dropdown-toggle-btn')) return false;
+    if (targetEl.closest('#view-trainer .trainer-card')) return false;
+    return true;
+}
+
+function switchTabByOffset(offset) {
+    const currentIndex = TAB_ORDER.indexOf(currentTab);
+    if (currentIndex < 0) return false;
+
+    const nextIndex = currentIndex + offset;
+    if (nextIndex < 0 || nextIndex >= TAB_ORDER.length) return false;
+
+    const nextTab = TAB_ORDER[nextIndex];
+    if (!nextTab || nextTab === currentTab) return false;
+
+    switchTab(nextTab);
+    return true;
+}
+
+function handleTabSwipeTouchStart(event) {
+    if (!event || !event.touches || event.touches.length !== 1) {
+        tabSwipeState = null;
+        return;
+    }
+
+    if (document.querySelector('.dropdown-content.show')) {
+        tabSwipeState = null;
+        return;
+    }
+
+    const targetEl = event.target instanceof Element ? event.target : null;
+    if (!canHandleTabSwipeTarget(targetEl)) {
+        tabSwipeState = null;
+        return;
+    }
+
+    const touchPoint = readTrainerTouchPoint(event);
+    if (!touchPoint) {
+        tabSwipeState = null;
+        return;
+    }
+
+    tabSwipeState = {
+        identifier: touchPoint.identifier,
+        startX: touchPoint.clientX,
+        startY: touchPoint.clientY,
+        axis: null
+    };
+}
+
+function handleTabSwipeTouchMove(event) {
+    if (!tabSwipeState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, tabSwipeState.identifier);
+    if (!touchPoint) return;
+
+    const deltaX = touchPoint.clientX - tabSwipeState.startX;
+    const deltaY = touchPoint.clientY - tabSwipeState.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (!tabSwipeState.axis && (absX >= TAB_SWIPE_DIRECTION_LOCK_PX || absY >= TAB_SWIPE_DIRECTION_LOCK_PX)) {
+        tabSwipeState.axis = absX > absY * TAB_SWIPE_DIRECTION_RATIO ? 'x' : 'y';
+    }
+
+    if (tabSwipeState.axis === 'x' && event.cancelable) {
+        event.preventDefault();
+    }
+}
+
+function handleTabSwipeTouchEnd(event) {
+    if (!tabSwipeState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, tabSwipeState.identifier);
+    if (!touchPoint) {
+        tabSwipeState = null;
+        return;
+    }
+
+    const deltaX = touchPoint.clientX - tabSwipeState.startX;
+    const deltaY = touchPoint.clientY - tabSwipeState.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    tabSwipeState = null;
+
+    if (absX < TAB_SWIPE_MIN_DISTANCE_PX) return;
+    if (absX <= absY * TAB_SWIPE_DIRECTION_RATIO) return;
+
+    if (event.cancelable) event.preventDefault();
+
+    if (deltaX < 0) switchTabByOffset(1);
+    else switchTabByOffset(-1);
+}
+
+function handleTabSwipeTouchCancel() {
+    tabSwipeState = null;
+}
+
 function getTrainerTouchMoveDistance(touchPoint, touchState) {
     if (!touchPoint || !touchState) return Infinity;
     const deltaX = touchPoint.clientX - touchState.startX;
@@ -2665,7 +2803,9 @@ window.setMatrixStatus = function (statusType) {
 window.updateGlobalChar = function (index, newValue) {
     const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
     chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+    localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(chars));
     document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
+    updateCharSchemeButtons();
     initUI(); updateLayoutMode(); renderCurrentListView();
 }
 
@@ -2674,21 +2814,89 @@ window.toggleMatrixEdit = function (editable) {
     document.querySelectorAll('.header-input').forEach(inp => inp.readOnly = !editable);
 };;
 
+function isSameCharScheme(candidate = [], reference = []) {
+    if (!Array.isArray(candidate) || !Array.isArray(reference)) return false;
+    if (candidate.length !== reference.length) return false;
+    return candidate.every((value, index) => String(value).toLowerCase() === String(reference[index]).toLowerCase());
+}
+
+function getCurrentCharScheme() {
+    if (isSameCharScheme(chars, CHARS_EN)) return 'en';
+    if (isSameCharScheme(chars, CHARS_ZH)) return 'zh';
+    return 'custom';
+}
+
+function getSavedCustomChars() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(CUSTOM_CHARS_KEY));
+        const normalized = sanitizeChars(saved);
+        return normalized ? normalized : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function saveCustomChars(nextChars = chars) {
+    const normalized = sanitizeChars(nextChars);
+    if (!normalized) return;
+    localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(normalized));
+}
+
+function updateCharSchemeButtons() {
+    const currentScheme = getCurrentCharScheme();
+    setActionButtonActive(document.getElementById('chars-zh-btn'), currentScheme === 'zh');
+    setActionButtonActive(document.getElementById('chars-en-btn'), currentScheme === 'en');
+    setActionButtonActive(document.getElementById('chars-custom-btn'), currentScheme === 'custom');
+}
+
+function setCharScheme(scheme = 'zh') {
+    const nextScheme = scheme === 'en' ? 'en' : (scheme === 'custom' ? 'custom' : 'zh');
+    const currentScheme = getCurrentCharScheme();
+
+    if (currentScheme === 'custom') {
+        saveCustomChars(chars);
+    }
+
+    if (nextScheme === 'en') {
+        chars = [...CHARS_EN];
+    } else if (nextScheme === 'zh') {
+        chars = [...CHARS_ZH];
+    } else {
+        const savedCustom = getSavedCustomChars();
+        if (savedCustom) chars = [...savedCustom];
+        else saveCustomChars(chars);
+    }
+
+    localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+
+    initUI();
+    applyLanguage();
+    updateLayoutMode();
+    renderCurrentListView();
+    generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+}
+
 function resetDefaultChars() {
     if (confirm(t('alert_reset'))) {
-        chars = (currentLang === 'en') ? [...CHARS_EN] : [...CHARS_ZH];
-        localStorage.removeItem(CHARS_KEY); initUI(); applyLanguage(); updateLayoutMode(); renderCurrentListView(); alert(t('alert_reset_done'));
+        const currentScheme = getCurrentCharScheme();
+        if (currentScheme === 'en') chars = [...CHARS_EN];
+        else if (currentScheme === 'zh') chars = [...CHARS_ZH];
+        else chars = (currentLang === 'en') ? [...CHARS_EN] : [...CHARS_ZH];
+
+        localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+        initUI();
+        applyLanguage();
+        updateLayoutMode();
+        renderCurrentListView();
+        alert(t('alert_reset_done'));
     }
 }
 function toggleLanguage() {
     currentLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
-    localStorage.setItem(LANG_KEY, currentLang); applyLanguage();
-    if (currentLang === 'en' && JSON.stringify(chars) === JSON.stringify(CHARS_ZH)) {
-        if (confirm(t('confirm_switch_chars_en'))) { chars = [...CHARS_EN]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
-    } else if (currentLang === 'zh-TW' && JSON.stringify(chars) === JSON.stringify(CHARS_EN)) {
-        if (confirm(t('confirm_switch_chars_zh'))) { chars = [...CHARS_ZH]; localStorage.setItem(CHARS_KEY, JSON.stringify(chars)); initUI(); }
-    }
-    updateLayoutMode(); renderCurrentListView();
+    localStorage.setItem(LANG_KEY, currentLang);
+    applyLanguage();
+    updateLayoutMode();
+    renderCurrentListView();
 }
 function applyLanguage() {
     document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
@@ -2703,12 +2911,15 @@ function applyLanguage() {
     updateDropdownLabel('trainer_start'); updateDropdownLabel('trainer_end');
     updateMemoryContentModeButtons();
     updateTrainerAlgorithmButtons();
+    updateCharSchemeButtons();
     updateTrainerTypeBadge();
-    if (!currentTrainerScramble) document.getElementById('trainer-scramble').innerText = t('trainer_scramble_placeholder');
+    setTrainerScrambleDisplay(currentTrainerScramble);
     setTrainerStatus(currentTrainerStatusKey);
     renderTrainerRecords();
     toggleViewMode(currentListViewMode);
 }
+
+window.setCharScheme = setCharScheme;
 
 function setMemoryCardFlipped(isFlipped) {
     const memoryCard = document.getElementById('memory-card');
@@ -3123,6 +3334,7 @@ function importData() {
             if (normalizedData.chars) {
                 chars = normalizedData.chars;
                 localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+                if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
             }
 
             if (normalizedData.lang) {

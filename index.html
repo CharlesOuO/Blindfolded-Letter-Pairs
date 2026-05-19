@@ -506,6 +506,20 @@
                     </div>
 
                     <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="settings_chars_label">代碼方案</div>
+                        <div class="settings-action-card settings-char-card">
+                            <div class="settings-char-btn-row">
+                                <button id="chars-zh-btn" class="action-btn settings-char-btn" onclick="setCharScheme('zh')"
+                                    data-i18n="btn_chars_zh">注音 ㄅ~ㄩ</button>
+                                <button id="chars-en-btn" class="action-btn settings-char-btn" onclick="setCharScheme('en')"
+                                    data-i18n="btn_chars_en">English a~x</button>
+                                <button id="chars-custom-btn" class="action-btn settings-char-btn" onclick="setCharScheme('custom')"
+                                    data-i18n="btn_chars_custom">自訂</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
                         <div class="backup-group-label" data-i18n="title_backup">備份</div>
                         <div class="export-controls">
                             <div class="styled-select-wrapper">
@@ -522,13 +536,12 @@
                     </div>
 
                     <div class="backup-group">
-                        <div class="import-card">
-                            <label data-i18n="lbl_select_file"
-                                style="font-weight:500; color:#475569; width:100%;">匯入檔案：</label>
-                            <div class="import-controls import-controls-full">
-                                <input type="file" id="file-input" accept=".json" class="file-input">
-                                <button class="btn-import" onclick="importData()" data-i18n="btn_import">確認匯入</button>
+                        <div class="export-controls import-controls-row">
+                            <div class="styled-select-wrapper file-input-wrapper">
+                                <input type="file" id="file-input" accept=".json" class="file-input"
+                                    aria-label="Import File">
                             </div>
+                            <button class="action-btn btn-export" onclick="importData()" data-i18n="btn_import">確認匯入</button>
                         </div>
                     </div>
 
