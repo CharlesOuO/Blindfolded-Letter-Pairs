@@ -1,0 +1,35 @@
+{
+    "name": "blindfolded-letter-pairs",
+    "version": "1.0.0",
+    "description": "A bilingual browser-based practice tool for 3BLD.\r It helps you manage letter pair words, review 3-style algorithms, and train recall with flashcards and typing tests.",
+    "main": ".tmp_i18n_check.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "prepare:web": "node scripts/prepare-web.js",
+        "cap:copy": "npm run prepare:web && npx cap copy",
+        "cap:sync": "npm run prepare:web && npx cap sync",
+        "android:add": "npx cap add android",
+        "android:open": "npx cap open android",
+        "android:icons": "powershell -ExecutionPolicy Bypass -File scripts/update-android-icons.ps1",
+        "android:apk:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-android-debug.ps1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/CharlesOuO/Blindfolded-Letter-Pairs.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "bugs": {
+        "url": "https://github.com/CharlesOuO/Blindfolded-Letter-Pairs/issues"
+    },
+    "homepage": "https://github.com/CharlesOuO/Blindfolded-Letter-Pairs#readme",
+    "devDependencies": {
+        "@capacitor/android": "^8.3.4",
+        "@capacitor/cli": "^8.3.4"
+    },
+    "dependencies": {
+        "@capacitor/core": "^8.3.4"
+    }
+}

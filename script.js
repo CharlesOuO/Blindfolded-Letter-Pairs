@@ -56,7 +56,6 @@ let trainerClearMenuOpen = false;
 let trainerCubeSolverInitState = 'unknown';
 let trainerTouchTapState = null;
 let trainerTouchSuppressClickUntil = 0;
-let tabSwipeState = null;
 let trainerScrambleNavigation = {
     corner: { items: [], index: -1 },
     edge: { items: [], index: -1 }
@@ -78,9 +77,13 @@ const TRAINER_SCRAMBLE_HISTORY_LIMIT = 200;
 const TRAINER_CUBE_SOLVER_MAX_DEPTH = 22;
 const TRAINER_TOUCH_TAP_MAX_MOVE_PX = 14;
 const TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS = 700;
-const TAB_SWIPE_MIN_DISTANCE_PX = 72;
-const TAB_SWIPE_DIRECTION_RATIO = 1.2;
-const TAB_SWIPE_DIRECTION_LOCK_PX = 14;
+const TRAINER_ACTION_ICONS = Object.freeze({
+    plus2: '◷',
+    dnf: '⊘',
+    delete: '⌫',
+    cancel: '↺',
+    confirm: '✓'
+});
 
 // --- [新增] 矩陣模式目前選中的配對 ---
 let currentMatrixPair = null;
@@ -703,13 +706,6 @@ function setupEventListeners() {
         trainerCardEl.addEventListener('touchmove', handleTrainerCardTouchMove, { passive: true });
         trainerCardEl.addEventListener('touchend', handleTrainerCardTouchEnd, { passive: false });
         trainerCardEl.addEventListener('touchcancel', handleTrainerCardTouchCancel, { passive: true });
-    }
-    const mainContainerEl = document.getElementById('main-container');
-    if (mainContainerEl) {
-        mainContainerEl.addEventListener('touchstart', handleTabSwipeTouchStart, { passive: true });
-        mainContainerEl.addEventListener('touchmove', handleTabSwipeTouchMove, { passive: false });
-        mainContainerEl.addEventListener('touchend', handleTabSwipeTouchEnd, { passive: true });
-        mainContainerEl.addEventListener('touchcancel', handleTabSwipeTouchCancel, { passive: true });
     }
 
     const listContainer = document.getElementById('grid-area');
@@ -1617,10 +1613,32 @@ function updateTrainerScrambleNavButtons() {
     prevBtn.disabled = navState.index <= 0;
 }
 
-function setTrainerScrambleDisplay(scramble = '') {
+function formatTrainerPairCaseLabel(pair = '') {
+    if (!pair) return '';
+
+    const normalizedPair = String(pair);
+    const [startIndex, endIndex] = getPairIndices(normalizedPair);
+    if (startIndex === -1 || endIndex === -1) return normalizedPair.toUpperCase();
+
+    const startLabel = chars[startIndex];
+    const endLabel = chars[endIndex];
+    if (!startLabel || !endLabel) return normalizedPair.toUpperCase();
+
+    return `${String(startLabel).toUpperCase()}${String(endLabel).toUpperCase()}`;
+}
+
+function setTrainerScrambleDisplay(scramble = '', pair = currentTrainerPair) {
     const scrambleEl = document.getElementById('trainer-scramble');
     if (!scrambleEl) return;
-    scrambleEl.innerText = scramble || t('trainer_scramble_placeholder');
+
+    const scrambleText = String(scramble || '').trim();
+    if (!scrambleText) {
+        scrambleEl.innerText = t('trainer_scramble_placeholder');
+        return;
+    }
+
+    const caseLabel = formatTrainerPairCaseLabel(pair);
+    scrambleEl.innerText = caseLabel ? `${scrambleText} (${caseLabel})` : scrambleText;
 }
 
 function applyTrainerScrambleSnapshot(snapshot, options = {}) {
@@ -1630,7 +1648,7 @@ function applyTrainerScrambleSnapshot(snapshot, options = {}) {
     currentTrainerScramble = snapshot.scramble;
     currentTrainerAlgorithm = formatTrainerCommutatorText(snapshot.algorithm || '');
 
-    setTrainerScrambleDisplay(currentTrainerScramble);
+    setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
     updateTrainerTypeBadge();
 
     if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
@@ -1879,6 +1897,24 @@ function setTrainerTimerDisplay(value = '0.00') {
     if (timerEl) timerEl.innerText = value;
 }
 
+function setTrainerActionButtonIcon(buttonEl, icon = '', label = '') {
+    if (!buttonEl) return;
+    buttonEl.classList.add('trainer-icon-btn');
+    buttonEl.innerText = icon;
+    if (label) {
+        buttonEl.setAttribute('aria-label', label);
+        buttonEl.title = label;
+    } else {
+        buttonEl.removeAttribute('aria-label');
+        buttonEl.removeAttribute('title');
+    }
+}
+
+function updateTrainerPenaltyButtonIcons() {
+    setTrainerActionButtonIcon(document.getElementById('trainer-plus2-btn'), TRAINER_ACTION_ICONS.plus2, t('btn_penalty_plus2'));
+    setTrainerActionButtonIcon(document.getElementById('trainer-dnf-btn'), TRAINER_ACTION_ICONS.dnf, t('btn_penalty_dnf'));
+}
+
 function updateTrainerTimerVisualState() {
     const timerEl = document.getElementById('trainer-timer');
     if (!timerEl) return;
@@ -1899,7 +1935,10 @@ function updateTrainerDeleteButtons() {
     const confirmBtn = document.getElementById('trainer-delete-confirm-btn');
     if (!deleteBtn || !confirmBtn) return;
 
-    deleteBtn.innerText = t(trainerDeleteConfirmArmed ? 'btn_delete_cancel' : 'btn_delete_solve');
+    const deleteLabelKey = trainerDeleteConfirmArmed ? 'btn_delete_cancel' : 'btn_delete_solve';
+    const deleteIcon = trainerDeleteConfirmArmed ? TRAINER_ACTION_ICONS.cancel : TRAINER_ACTION_ICONS.delete;
+    setTrainerActionButtonIcon(deleteBtn, deleteIcon, t(deleteLabelKey));
+    setTrainerActionButtonIcon(confirmBtn, TRAINER_ACTION_ICONS.confirm, t('btn_delete_confirm'));
     deleteBtn.classList.toggle('is-armed', trainerDeleteConfirmArmed);
     confirmBtn.classList.toggle('hidden', !trainerDeleteConfirmArmed);
 }
@@ -2006,6 +2045,7 @@ function renderTrainerRecords() {
 
     if (penaltyShellEl) penaltyShellEl.classList.toggle('hidden', !latestRecord);
 
+    updateTrainerPenaltyButtonIcons();
     setActionButtonActive(document.getElementById('trainer-plus2-btn'), latestRecord?.penalty === 'plus2');
     setActionButtonActive(document.getElementById('trainer-dnf-btn'), latestRecord?.penalty === 'dnf');
     updateTrainerDeleteButtons();
@@ -2078,8 +2118,8 @@ function renderTrainerRecords() {
 
                     const plus2Btn = document.createElement('button');
                     plus2Btn.type = 'button';
-                    plus2Btn.className = 'action-btn trainer-history-action-btn';
-                    plus2Btn.innerText = t('btn_penalty_plus2');
+                    plus2Btn.className = 'action-btn trainer-history-action-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(plus2Btn, TRAINER_ACTION_ICONS.plus2, t('btn_penalty_plus2'));
                     setActionButtonActive(plus2Btn, record.penalty === 'plus2');
                     plus2Btn.addEventListener('click', (event) => {
                         event.stopPropagation();
@@ -2088,8 +2128,8 @@ function renderTrainerRecords() {
 
                     const dnfBtn = document.createElement('button');
                     dnfBtn.type = 'button';
-                    dnfBtn.className = 'action-btn trainer-history-action-btn';
-                    dnfBtn.innerText = t('btn_penalty_dnf');
+                    dnfBtn.className = 'action-btn trainer-history-action-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(dnfBtn, TRAINER_ACTION_ICONS.dnf, t('btn_penalty_dnf'));
                     setActionButtonActive(dnfBtn, record.penalty === 'dnf');
                     dnfBtn.addEventListener('click', (event) => {
                         event.stopPropagation();
@@ -2098,8 +2138,12 @@ function renderTrainerRecords() {
 
                     const deleteBtn = document.createElement('button');
                     deleteBtn.type = 'button';
-                    deleteBtn.className = 'action-btn trainer-history-action-btn trainer-delete-btn';
-                    deleteBtn.innerText = t(isDeleteConfirming ? 'btn_delete_cancel' : 'btn_delete_solve');
+                    deleteBtn.className = 'action-btn trainer-history-action-btn trainer-delete-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(
+                        deleteBtn,
+                        isDeleteConfirming ? TRAINER_ACTION_ICONS.cancel : TRAINER_ACTION_ICONS.delete,
+                        t(isDeleteConfirming ? 'btn_delete_cancel' : 'btn_delete_solve')
+                    );
                     deleteBtn.classList.toggle('is-armed', isDeleteConfirming);
                     deleteBtn.addEventListener('click', (event) => {
                         event.stopPropagation();
@@ -2108,8 +2152,8 @@ function renderTrainerRecords() {
 
                     const confirmBtn = document.createElement('button');
                     confirmBtn.type = 'button';
-                    confirmBtn.className = `action-btn trainer-history-action-btn trainer-delete-confirm-btn${isDeleteConfirming ? '' : ' hidden'}`;
-                    confirmBtn.innerText = t('btn_delete_confirm');
+                    confirmBtn.className = `action-btn trainer-history-action-btn trainer-delete-confirm-btn trainer-icon-btn${isDeleteConfirming ? '' : ' hidden'}`;
+                    setTrainerActionButtonIcon(confirmBtn, TRAINER_ACTION_ICONS.confirm, t('btn_delete_confirm'));
                     confirmBtn.addEventListener('click', (event) => {
                         event.stopPropagation();
                         confirmDeleteTrainerRecord(record.id);
@@ -2298,107 +2342,6 @@ function readTrainerTouchPoint(event, identifier = null) {
         }
     }
     return null;
-}
-
-function canHandleTabSwipeTarget(targetEl) {
-    if (!(targetEl instanceof Element)) return false;
-    if (targetEl.closest('button, a, input, textarea, select, label, [contenteditable], [role="button"]')) return false;
-    if (targetEl.closest('.dropdown-content, .dropdown-toggle-btn')) return false;
-    if (targetEl.closest('#view-trainer .trainer-card')) return false;
-    return true;
-}
-
-function switchTabByOffset(offset) {
-    const currentIndex = TAB_ORDER.indexOf(currentTab);
-    if (currentIndex < 0) return false;
-
-    const nextIndex = currentIndex + offset;
-    if (nextIndex < 0 || nextIndex >= TAB_ORDER.length) return false;
-
-    const nextTab = TAB_ORDER[nextIndex];
-    if (!nextTab || nextTab === currentTab) return false;
-
-    switchTab(nextTab);
-    return true;
-}
-
-function handleTabSwipeTouchStart(event) {
-    if (!event || !event.touches || event.touches.length !== 1) {
-        tabSwipeState = null;
-        return;
-    }
-
-    if (document.querySelector('.dropdown-content.show')) {
-        tabSwipeState = null;
-        return;
-    }
-
-    const targetEl = event.target instanceof Element ? event.target : null;
-    if (!canHandleTabSwipeTarget(targetEl)) {
-        tabSwipeState = null;
-        return;
-    }
-
-    const touchPoint = readTrainerTouchPoint(event);
-    if (!touchPoint) {
-        tabSwipeState = null;
-        return;
-    }
-
-    tabSwipeState = {
-        identifier: touchPoint.identifier,
-        startX: touchPoint.clientX,
-        startY: touchPoint.clientY,
-        axis: null
-    };
-}
-
-function handleTabSwipeTouchMove(event) {
-    if (!tabSwipeState) return;
-
-    const touchPoint = readTrainerTouchPoint(event, tabSwipeState.identifier);
-    if (!touchPoint) return;
-
-    const deltaX = touchPoint.clientX - tabSwipeState.startX;
-    const deltaY = touchPoint.clientY - tabSwipeState.startY;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-
-    if (!tabSwipeState.axis && (absX >= TAB_SWIPE_DIRECTION_LOCK_PX || absY >= TAB_SWIPE_DIRECTION_LOCK_PX)) {
-        tabSwipeState.axis = absX > absY * TAB_SWIPE_DIRECTION_RATIO ? 'x' : 'y';
-    }
-
-    if (tabSwipeState.axis === 'x' && event.cancelable) {
-        event.preventDefault();
-    }
-}
-
-function handleTabSwipeTouchEnd(event) {
-    if (!tabSwipeState) return;
-
-    const touchPoint = readTrainerTouchPoint(event, tabSwipeState.identifier);
-    if (!touchPoint) {
-        tabSwipeState = null;
-        return;
-    }
-
-    const deltaX = touchPoint.clientX - tabSwipeState.startX;
-    const deltaY = touchPoint.clientY - tabSwipeState.startY;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-    tabSwipeState = null;
-
-    if (absX < TAB_SWIPE_MIN_DISTANCE_PX) return;
-    if (absX <= absY * TAB_SWIPE_DIRECTION_RATIO) return;
-
-    if (event.cancelable) event.preventDefault();
-
-    if (deltaX < 0) switchTabByOffset(1);
-    else switchTabByOffset(-1);
-}
-
-function handleTabSwipeTouchCancel() {
-    tabSwipeState = null;
 }
 
 function getTrainerTouchMoveDistance(touchPoint, touchState) {
@@ -2969,7 +2912,7 @@ function applyLanguage() {
     updateTrainerAlgorithmButtons();
     updateCharSchemeButtons();
     updateTrainerTypeBadge();
-    setTrainerScrambleDisplay(currentTrainerScramble);
+    setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
     setTrainerStatus(currentTrainerStatusKey);
     renderTrainerRecords();
     toggleViewMode(currentListViewMode);

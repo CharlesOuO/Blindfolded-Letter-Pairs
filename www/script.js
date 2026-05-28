@@ -1,0 +1,3370 @@
+const CHARS_ZH = ['ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ', 'ㄍ', 'ㄎ', 'ㄏ', 'ㄐ', 'ㄑ', 'ㄒ', 'ㄓ', 'ㄔ', 'ㄕ', 'ㄖ', 'ㄗ', 'ㄘ', 'ㄙ', 'ㄧ', 'ㄨ', 'ㄩ'];
+const CHARS_EN = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x'];
+let chars = [...CHARS_ZH];
+
+const STORAGE_KEY = 'bld_custom_dict_v3';
+const STATUS_KEY = 'bld_status_v1';
+const LEGACY_FORMULA_STORAGE_KEY = 'bld_formula_dict_v1';
+const LEGACY_FORMULA_STATUS_KEY = 'bld_formula_status_v1';
+const CORNER_FORMULA_STORAGE_KEY = 'bld_formula_corner_dict_v1';
+const EDGE_FORMULA_STORAGE_KEY = 'bld_formula_edge_dict_v1';
+const CORNER_FORMULA_STATUS_KEY = 'bld_formula_corner_status_v1';
+const EDGE_FORMULA_STATUS_KEY = 'bld_formula_edge_status_v1';
+const LANG_KEY = 'bld_lang_v1';
+const CHARS_KEY = 'bld_chars_v1';
+const CUSTOM_CHARS_KEY = 'bld_custom_chars_v1';
+const TRAINER_RECORDS_KEY = 'bld_trainer_records_v1';
+const APP_STORAGE_KEYS = [
+    STORAGE_KEY,
+    STATUS_KEY,
+    LEGACY_FORMULA_STORAGE_KEY,
+    LEGACY_FORMULA_STATUS_KEY,
+    CORNER_FORMULA_STORAGE_KEY,
+    EDGE_FORMULA_STORAGE_KEY,
+    CORNER_FORMULA_STATUS_KEY,
+    EDGE_FORMULA_STATUS_KEY,
+    LANG_KEY,
+    CHARS_KEY,
+    CUSTOM_CHARS_KEY,
+    TRAINER_RECORDS_KEY
+];
+
+let currentPair = null;
+let isMemAnswerShown = false;
+let lastMemPair = null;
+let recentMemPairs = [];
+let currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
+let isMatrixMode = false;
+let currentListViewMode = 'list';
+let currentAlgorithmType = 'corner';
+let currentMemoryContentModes = ['word'];
+let currentTrainerAlgorithmType = 'corner';
+let currentTrainerPair = null;
+let currentTrainerScramble = '';
+let currentTrainerAlgorithm = '';
+let trainerRecords = [];
+let latestTrainerRecordId = null;
+let trainerTimerState = 'idle';
+let trainerHoldTimeoutId = null;
+let trainerAnimationFrameId = null;
+let trainerStartTimestamp = 0;
+let currentTrainerStatusKey = 'trainer_status_idle';
+let trainerDeleteConfirmArmed = false;
+let expandedTrainerRecordId = null;
+let trainerHistoryDeleteConfirmRecordId = null;
+let trainerClearMenuOpen = false;
+let trainerCubeSolverInitState = 'unknown';
+let trainerTouchTapState = null;
+let trainerTouchSuppressClickUntil = 0;
+let trainerScrambleNavigation = {
+    corner: { items: [], index: -1 },
+    edge: { items: [], index: -1 }
+};
+let trainerAlgorithmDrawState = {
+    corner: {},
+    edge: {}
+};
+let trainerPairDrawState = {
+    corner: { signature: '', total: 0, drawOrder: [] },
+    edge: { signature: '', total: 0, drawOrder: [] }
+};
+let currentTab = 'list';
+const BUILT_IN_ALGORITHMS = window.BUILT_IN_ALGORITHMS || { corner: {}, edge: {} };
+const MEMORY_REPEAT_GAP = 5;
+const TAB_ORDER = ['list', 'memory', 'trainer', 'data'];
+const TRAINER_AVERAGE_COUNTS = [5, 12, 50, 100];
+const TRAINER_SCRAMBLE_HISTORY_LIMIT = 200;
+const TRAINER_CUBE_SOLVER_MAX_DEPTH = 22;
+const TRAINER_TOUCH_TAP_MAX_MOVE_PX = 14;
+const TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS = 700;
+const TRAINER_ACTION_ICONS = Object.freeze({
+    plus2: '◷',
+    dnf: '⊘',
+    delete: '⌫',
+    cancel: '↺',
+    confirm: '✓'
+});
+
+// --- [新增] 矩陣模式目前選中的配對 ---
+let currentMatrixPair = null;
+let selectedMatrixPairs = new Set();
+let appInitCompleted = false;
+let bootTransitionCompleted = false;
+
+// --- 優化工具: 防抖函數 (Debounce) ---
+const debounce = (fn, delay = 500) => {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn.apply(this, args), delay);
+    };
+};
+
+const savePairDataDebounced = debounce((pair, value, contentMode = 'word') => {
+    const d = getContentDict(contentMode);
+    d[pair] = value.trim();
+    saveContentDict(contentMode, d);
+}, 500);
+
+function readStoredJson(key, fallbackValue) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallbackValue;
+
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed ?? fallbackValue;
+    } catch (error) {
+        // Prevent one malformed localStorage entry from breaking app boot.
+        localStorage.removeItem(key);
+        return fallbackValue;
+    }
+}
+
+const translations = {
+    'zh-TW': {
+        nav_list: "列表輸入", nav_mem: "記憶翻牌", nav_test: "打字測驗", nav_data: "設定",
+        lbl_start_char: "開頭代碼：", btn_reset_color: "重置熟悉度：",
+        lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題", btn_start_test: "開始測驗 (Space)",
+        btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter",
+        title_settings: "設定", title_backup: "備份", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料",
+        opt_json: "系統備份檔 (.json)", opt_csv: "Excel 表格 (.csv)", btn_export_exec: "匯出資料",
+        hint_matrix_edit: "提示：點擊表頭可修改代碼",
+        btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "表格模式", btn_same: "同",
+        alert_chars_empty: "輸入不能為空！", alert_reset: "確定重置？", alert_reset_done: "已重置",
+        opt_start: " 開頭", sel_full: "全選", sel_none: "未選擇", sel_count: "已選 {n} 個", sel_prefix: "SEL: ",
+        hint_click_flip: "點擊卡片翻牌", fb_empty: "空白跳過", fb_wrong: "不熟", fb_slow: "猶豫", fb_good: "熟練",
+        ans_prefix: "答案：", alert_no_data: "請先輸入資料！", alert_sel_range: "請選擇範圍", alert_import_success: "匯入成功", alert_import_error: "格式錯誤",
+        lbl_start: "開頭：", lbl_end: "結尾：",
+        btn_hide: "隱藏", lbl_edit_mode: "編輯模式", btn_reset_all: "全部",
+        settings_formula_title: "公式預設",
+        settings_formula_prefix: "公式預設來源為 ",
+        settings_formula_suffix: "，預設使用 Speffz lettering scheme。",
+        settings_language_label: "語言",
+        settings_language_hint: "可在中文與 English 之間切換介面語言。"
+    },
+    'en': {
+        nav_list: "List Input", nav_mem: "Flashcards", nav_test: "Typing Test", nav_data: "Setting",
+        lbl_start_char: "Start Code:", btn_reset_color: "Reset familiarity:",
+        lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next", btn_start_test: "Start Test (Space)",
+        btn_submit: "Submit (Enter)", ph_input: "Type & Enter",
+        title_settings: "Setting", title_backup: "Backup", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data",
+        opt_json: "Backup File (.json)", opt_csv: "Excel Table (.csv)", btn_export_exec: "Export Data",
+        hint_matrix_edit: "Click header to edit code",
+        btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Table Mode", btn_same: "Same",
+        alert_chars_empty: "Cannot be empty!", alert_reset: "Are you sure?", alert_reset_done: "Reset done.",
+        opt_start: " Start", sel_full: "ALL", sel_none: "NONE", sel_count: "{n} selected", sel_prefix: "SEL: ",
+        hint_click_flip: "Click to flip", fb_empty: "Skipped", fb_wrong: "Hard", fb_slow: "Slow", fb_good: "Good",
+        ans_prefix: "Ans: ", alert_no_data: "No data!", alert_sel_range: "Select range", alert_import_success: "Success", alert_import_error: "Error",
+        lbl_start: "Start:", lbl_end: "End:",
+        btn_hide: "Hide", lbl_edit_mode: "Edit Mode", btn_reset_all: "All",
+        settings_formula_title: "Formula Defaults",
+        settings_formula_prefix: "Default algorithms are sourced from ",
+        settings_formula_suffix: " and use the Speffz lettering scheme.",
+        settings_language_label: "Language",
+        settings_language_hint: "Switch the interface between English and Chinese."
+    }
+};
+
+Object.assign(translations['zh-TW'], {
+    nav_trainer: "3-Style 訓練",
+    mode_formula: "\u516c\u5f0f\u6a21\u5f0f",
+    mode_formula_matrix: "\u516c\u5f0f\u8868\u683c",
+    group_words: "\u5b57\u8a5e",
+    group_formula: "\u516c\u5f0f",
+    switch_layout: "\u7248\u578b",
+    switch_content: "\u5167\u5bb9",
+    switch_list: "\u5217\u8868",
+    switch_matrix: "\u8868\u683c",
+    switch_words: "\u5b57\u8a5e",
+    switch_algorithm: "\u516c\u5f0f",
+    algorithm_type: "\u516c\u5f0f\u985e\u578b",
+    algorithm_corners: "角塊",
+    algorithm_edges: "邊塊",
+    content_word_label: "\u5b57\u8a5e",
+    content_formula_label: "\u516c\u5f0f",
+    content_corner_label: "角塊",
+    content_edge_label: "邊塊",
+    study_word_mode: "\u5b57\u8a5e\u6a21\u5f0f",
+    study_formula_mode: "\u516c\u5f0f\u6a21\u5f0f",
+    study_corner_mode: "角塊模式",
+    study_edge_mode: "邊塊模式",
+    ph_formula: "\u8f38\u5165\u516c\u5f0f",
+    ph_algorithm: "\u8f38\u5165\u516c\u5f0f",
+    hint_formula_edit: "\u53ef\u5728\u9019\u88e1\u70ba\u6bcf\u7d44\u5b57\u6bcd\u5c0d\u8f38\u5165\u89d2\u584a\u6216\u908a\u584a\u516c\u5f0f\uff0c\u7a7a\u767d\u6642\u6703\u986f\u793a\u5167\u5efa BLDDB \u9810\u8a2d\u4ea4\u63db\u5b50\uff0c\u7ffb\u724c\u6a21\u5f0f\u4e5f\u53ef\u4ee5\u5206\u958b\u7df4\u7fd2",
+    alert_no_formula_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u516c\u5f0f\u8cc7\u6599\uff01",
+    alert_no_algorithm_data: "\u76ee\u524d\u9078\u53d6\u7bc4\u570d\u6c92\u6709\u89d2\u584a\u6216\u908a\u584a\u516c\u5f0f\u8cc7\u6599\uff01",
+    alert_select_matrix_cells: "\u8acb\u5148\u9ede\u9078\u77e9\u9663\u4e2d\u7684\u683c\u5b50\uff01",
+    msg_matrix_updated: "\u5df2\u66f4\u65b0\uff01",
+    confirm_switch_chars_en: "\u8981\u4e00\u8d77\u5207\u63db\u6210\u82f1\u6587 a-x \u4ee3\u78bc\u55ce\uff1f",
+    confirm_switch_chars_zh: "\u8981\u5207\u56de\u6ce8\u97f3\u4ee3\u78bc\u55ce\uff1f",
+    trainer_scramble_label: "\u6253\u4e82",
+    trainer_scramble_placeholder: "\u6309\u4e0b\u300c\u7522\u751f\u4e0b\u4e00\u7d44\u6253\u4e82\u300d\u958b\u59cb\u3002",
+    trainer_scramble_hint: "\u6253\u4e82\u5b8c\u6210\u5f8c\u6309\u4e00\u4e0b\u7a7a\u767d\u9375\u958b\u59cb\u8a08\u6642\uff0c\u4efb\u610f\u9375\u505c\u6b62\u3002",
+    trainer_status_idle: "\u6309\u4e00\u4e0b\u7a7a\u767d\u9375\u958b\u59cb",
+    trainer_status_holding: "\u7e7c\u7e8c\u6309\u4f4f\u2026",
+    trainer_status_ready: "\u653e\u958b\u958b\u59cb",
+    trainer_status_running: "\u8a08\u6642\u4e2d",
+    trainer_status_stopped: "\u5df2\u8a18\u9304\u9019\u6b21\u6210\u7e3e\uff0c\u53ef\u4ee5\u9078\u64c7 +2\u3001DNF \u6216\u522a\u9664\u3002",
+    trainer_status_delete_confirm: "\u518d\u6309\u4e00\u6b21\u300c\u78ba\u8a8d\u300d\u624d\u6703\u522a\u9664\u6700\u8fd1\u4e00\u6b21\u6210\u7e3e\u3002",
+    trainer_status_no_scramble: "\u76ee\u524d\u7bc4\u570d\u6c92\u6709\u53ef\u7528\u7684\u6253\u4e82\u3002",
+    btn_generate_scramble: "\u7522\u751f\u4e0b\u4e00\u7d44\u6253\u4e82",
+    btn_prev_scramble: "\u4e0a\u4e00\u7d44\u6253\u4e82",
+    btn_penalty_plus2: "+2",
+    btn_penalty_dnf: "DNF",
+    btn_delete_solve: "\u522a\u9664",
+    btn_delete_cancel: "\u53d6\u6d88",
+    btn_delete_confirm: "\u78ba\u8a8d",
+    trainer_last_result_label: "\u6700\u8fd1\u4e00\u6b21",
+    trainer_averages_label: "\u5e73\u5747",
+    trainer_history_label: "\u7d00\u9304",
+    trainer_solution_label: "\u89e3\u6cd5",
+    trainer_history_empty: "\u9084\u6c92\u6709\u8a08\u6642\u7d00\u9304",
+    btn_clear_records: "\u6e05\u9664\u7d00\u9304",
+    btn_clear_corners_records: "\u522a\u9664\u89d2\u584a",
+    btn_clear_edges_records: "\u522a\u9664\u908a\u584a",
+    confirm_clear_trainer_records: "\u78ba\u5b9a\u8981\u522a\u9664\u6240\u6709 {type} \u7d00\u9304\uff08\u5171 {count} \u7b46\uff09\u55ce\uff1f\u6b64\u52d5\u4f5c\u7121\u6cd5\u5fa9\u539f\u3002",
+    alert_no_trainer_records_type: "\u76ee\u524d\u6c92\u6709 {type} \u7d00\u9304\u53ef\u522a\u9664\u3002",
+    alert_invalid_algorithm_format: "\u9019\u7d44\u516c\u5f0f\u683c\u5f0f\u76ee\u524d\u7121\u6cd5\u7528\u4f86\u751f\u6210\u6253\u4e82\u3002",
+    btn_toggle_lang: "English / \u4e2d\u6587",
+    settings_chars_label: "\u7de8\u78bc\u7cfb\u7d71",
+    settings_chars_hint: "\u53ef\u7368\u7acb\u9078\u64c7\u6ce8\u97f3\uff08\u3105~\u3129\uff09\u3001\u82f1\u6587\uff08a~x\uff09\u6216\u81ea\u8a02\uff1b\u5207\u63db\u5230\u82f1\u6587\u4e0d\u6703\u8986\u84cb\u4f60\u7684\u81ea\u8a02\u3002",
+    btn_chars_zh: "\u6ce8\u97f3 \u3105~\u3129",
+    btn_chars_en: "English a~x",
+    btn_chars_custom: "\u81ea\u8a02",
+    page_title: "3BLD 3-Style Letter Pairs \u7df4\u7fd2",
+    sel_prefix: "\u5df2\u9078\uff1a"
+});
+
+Object.assign(translations.en, {
+    nav_trainer: "3-Style Trainer",
+    mode_formula: "Formula Mode",
+    mode_formula_matrix: "Formula Table",
+    group_words: "Words",
+    group_formula: "Formula",
+    switch_layout: "Layout",
+    switch_content: "Content",
+    switch_list: "List",
+    switch_matrix: "Table",
+    switch_words: "Words",
+    switch_algorithm: "Algorithm",
+    algorithm_type: "Algorithm Type",
+    algorithm_corners: "Corners",
+    algorithm_edges: "Edges",
+    content_word_label: "Word",
+    content_formula_label: "Formula",
+    content_corner_label: "Corners",
+    content_edge_label: "Edges",
+    study_word_mode: "Word Mode",
+    study_formula_mode: "Formula Mode",
+    study_corner_mode: "Corners",
+    study_edge_mode: "Edges",
+    ph_formula: "Enter formula",
+    ph_algorithm: "Enter algorithm",
+    hint_formula_edit: "Edit corner or edge algorithms for the selected start code. Empty fields show built-in BLDDB commutators, and Flashcards can study them separately too.",
+    alert_no_formula_data: "No formula data in this range!",
+    alert_no_algorithm_data: "No corner or edge algorithm data in this range!",
+    alert_select_matrix_cells: "Please select matrix cells first!",
+    msg_matrix_updated: "Updated!",
+    confirm_switch_chars_en: "Also switch to English a-x codes?",
+    confirm_switch_chars_zh: "Switch back to Zhuyin codes as well?",
+    trainer_scramble_label: "Scramble",
+    trainer_scramble_placeholder: "Press Next Scramble to begin.",
+    trainer_scramble_hint: "Scramble first, press Space to start, and press any key to stop.",
+    trainer_status_idle: "Press Space to start",
+    trainer_status_holding: "Keep holding...",
+    trainer_status_ready: "Release to start",
+    trainer_status_running: "Timer running",
+    trainer_status_stopped: "Solve saved. You can choose +2, DNF, or delete it.",
+    trainer_status_delete_confirm: "Press Confirm again to delete the latest solve.",
+    trainer_status_no_scramble: "No available scramble in this range.",
+    btn_generate_scramble: "Next Scramble",
+    btn_prev_scramble: "Previous Scramble",
+    btn_penalty_plus2: "+2",
+    btn_penalty_dnf: "DNF",
+    btn_delete_solve: "Delete",
+    btn_delete_cancel: "Cancel",
+    btn_delete_confirm: "Confirm",
+    trainer_last_result_label: "Last Solve",
+    trainer_averages_label: "Averages",
+    trainer_history_label: "History",
+    trainer_solution_label: "Solution",
+    trainer_history_empty: "No solves yet.",
+    btn_clear_records: "Clear Records",
+    btn_clear_corners_records: "Delete Corners",
+    btn_clear_edges_records: "Delete Edges",
+    confirm_clear_trainer_records: "Delete all {type} records ({count})? This action cannot be undone.",
+    alert_no_trainer_records_type: "No {type} records to delete.",
+    alert_invalid_algorithm_format: "This algorithm format cannot be converted into a scramble yet.",
+    btn_toggle_lang: "\u4e2d\u6587 / English",
+    settings_chars_label: "Lettering System",
+    settings_chars_hint: "Choose Zhuyin (\u3105~\u3129), English (a~x), or Custom. Switching to English won't erase your custom scheme.",
+    btn_chars_zh: "Zhuyin \u3105~\u3129",
+    btn_chars_en: "English a~x",
+    btn_chars_custom: "Custom",
+    page_title: "3BLD(3 style & letter pairs) practice"
+});
+
+const SM2_SETTINGS = { defaultEf: 2.5, minEf: 1.3, intervals: [1, 3] };
+const REVIEW_DELAY_SETTINGS = {
+    hardMinutes: 10,
+    slowHours: 6
+};
+
+function isAlgorithmContentMode(contentMode = 'word') {
+    return contentMode === 'corner' || contentMode === 'edge';
+}
+
+function getContentStorageKey(contentMode = 'word') {
+    if (contentMode === 'corner') return CORNER_FORMULA_STORAGE_KEY;
+    if (contentMode === 'edge') return EDGE_FORMULA_STORAGE_KEY;
+    return STORAGE_KEY;
+}
+
+function getStatusStorageKey(contentMode = 'word') {
+    if (contentMode === 'corner') return CORNER_FORMULA_STATUS_KEY;
+    if (contentMode === 'edge') return EDGE_FORMULA_STATUS_KEY;
+    return STATUS_KEY;
+}
+
+function calculateNextReview(currentData, grade) {
+    let card = (typeof currentData === 'object' && currentData !== null) ? currentData : {
+        interval: 0, repetition: 0, ef: SM2_SETTINGS.defaultEf, dueDate: 0, color: 'red'
+    };
+    let nextInterval, nextRepetition, nextEf;
+    if (grade < 3) {
+        nextRepetition = 0; nextInterval = 1; nextEf = Math.max(SM2_SETTINGS.minEf, card.ef - 0.2);
+    } else {
+        nextRepetition = card.repetition + 1;
+        nextEf = card.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+        if (nextEf < SM2_SETTINGS.minEf) nextEf = SM2_SETTINGS.minEf;
+        if (nextRepetition === 1) nextInterval = SM2_SETTINGS.intervals[0];
+        else if (nextRepetition === 2) nextInterval = SM2_SETTINGS.intervals[1];
+        else nextInterval = Math.round(card.interval * nextEf);
+    }
+    let nextColor = grade >= 4 ? 'green' : (grade === 3 ? 'yellow' : 'red');
+    let nextDueDate;
+
+    if (grade < 3) {
+        nextDueDate = Date.now() + (REVIEW_DELAY_SETTINGS.hardMinutes * 60 * 1000);
+    } else if (grade === 3) {
+        nextDueDate = Date.now() + (REVIEW_DELAY_SETTINGS.slowHours * 60 * 60 * 1000);
+    } else {
+        nextDueDate = Date.now() + (nextInterval * 24 * 60 * 60 * 1000);
+    }
+
+    return { interval: nextInterval, repetition: nextRepetition, ef: nextEf, dueDate: nextDueDate, color: nextColor };
+}
+
+function getStatusMap(contentMode = 'word') {
+    return readStoredJson(getStatusStorageKey(contentMode), {});
+}
+function shouldDefaultHidePair(pair, contentMode = 'word') {
+    if (!isAlgorithmContentMode(contentMode)) return false;
+
+    const storedValue = (getContentDict(contentMode)[pair] || '').trim();
+    if (storedValue) return false;
+
+    return !getBuiltInAlgorithm(pair, contentMode);
+}
+function getPairData(pair, contentMode = 'word') {
+    const map = getStatusMap(contentMode);
+    let data = map[pair];
+    if (typeof data === 'string') {
+        return { interval: (data === 'green' ? 10 : 3), repetition: 1, ef: 2.5, dueDate: Date.now(), color: data };
+    }
+    if (data) return data;
+    if (shouldDefaultHidePair(pair, contentMode)) {
+        return { interval: -1, repetition: 0, ef: 2.5, dueDate: 0, color: 'gray' };
+    }
+    return null;
+}
+function saveStatusData(pair, dataObject, contentMode = 'word') {
+    const map = getStatusMap(contentMode);
+    map[pair] = dataObject;
+    localStorage.setItem(getStatusStorageKey(contentMode), JSON.stringify(map));
+}
+function getPairColor(pair, contentMode = 'word') { const data = getPairData(pair, contentMode); return data ? (data.color || 'red') : ''; }
+
+function t(key, params = {}) { let str = translations[currentLang][key] || key; Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); return str; }
+function getDict() { return readStoredJson(STORAGE_KEY, {}); }
+function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function getFormulaDict(formulaType = 'corner') { return readStoredJson(getContentStorageKey(formulaType), {}); }
+function saveFormulaDict(formulaType = 'corner', dict) { localStorage.setItem(getContentStorageKey(formulaType), JSON.stringify(dict)); }
+function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : getDict(); }
+function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : saveDict(dict); }
+
+function isPlainObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function escapeCsvCell(value = '') {
+    const stringValue = String(value ?? '');
+    if (!/[",\n\r]/.test(stringValue)) return stringValue;
+    return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function sanitizeStringMap(value) {
+    if (!isPlainObject(value)) return {};
+    const next = {};
+    Object.entries(value).forEach(([key, mapValue]) => {
+        if (typeof key !== 'string' || typeof mapValue !== 'string') return;
+        next[key] = mapValue;
+    });
+    return next;
+}
+
+function sanitizeStatusMap(value) {
+    if (!isPlainObject(value)) return {};
+
+    const next = {};
+    const allowedColors = new Set(['green', 'yellow', 'red', 'gray']);
+
+    Object.entries(value).forEach(([key, statusValue]) => {
+        if (typeof key !== 'string') return;
+
+        if (typeof statusValue === 'string') {
+            if (allowedColors.has(statusValue)) next[key] = statusValue;
+            return;
+        }
+
+        if (!isPlainObject(statusValue)) return;
+
+        const color = allowedColors.has(statusValue.color) ? statusValue.color : 'red';
+        next[key] = {
+            interval: Number.isFinite(Number(statusValue.interval)) ? Number(statusValue.interval) : 0,
+            repetition: Number.isFinite(Number(statusValue.repetition)) ? Number(statusValue.repetition) : 0,
+            ef: Number.isFinite(Number(statusValue.ef)) ? Number(statusValue.ef) : SM2_SETTINGS.defaultEf,
+            dueDate: Number.isFinite(Number(statusValue.dueDate)) ? Number(statusValue.dueDate) : 0,
+            color
+        };
+    });
+
+    return next;
+}
+
+function sanitizeChars(value) {
+    if (!Array.isArray(value)) return null;
+
+    const next = value
+        .map((char) => typeof char === 'string' ? char.trim() : '')
+        .filter(Boolean);
+
+    if (next.length < 2) return null;
+    if (new Set(next).size !== next.length) return null;
+
+    return next;
+}
+
+function sanitizeTrainerRecords(value) {
+    if (!Array.isArray(value)) return [];
+
+    const allowedPenalties = new Set(['ok', 'plus2', 'dnf']);
+
+    return value.map((record, index) => {
+        if (!isPlainObject(record)) return null;
+
+        const rawTimeMs = Number(record.rawTimeMs);
+        if (!Number.isFinite(rawTimeMs) || rawTimeMs < 0) return null;
+
+        return {
+            id: typeof record.id === 'string' && record.id ? record.id : `trainer-${Date.now()}-${index}`,
+            rawTimeMs,
+            penalty: allowedPenalties.has(record.penalty) ? record.penalty : 'ok',
+            scramble: typeof record.scramble === 'string' ? record.scramble : '',
+            pair: typeof record.pair === 'string' ? record.pair : '',
+            algorithm: typeof record.algorithm === 'string' ? record.algorithm : '',
+            algorithmType: record.algorithmType === 'edge' ? 'edge' : 'corner',
+            createdAt: Number.isFinite(Number(record.createdAt)) ? Number(record.createdAt) : Date.now()
+        };
+    }).filter(Boolean);
+}
+
+function normalizeBackupPayload(value) {
+    if (!isPlainObject(value)) throw new Error('Invalid backup payload');
+
+    const sections = isPlainObject(value.sections) ? value.sections : null;
+    const letterPairsSection = sections && isPlainObject(sections.letterPairs) ? sections.letterPairs : {};
+    const statusSection = sections && isPlainObject(sections.status) ? sections.status : {};
+    const trainerSection = sections && isPlainObject(sections.trainer) ? sections.trainer : {};
+    const settingsSection = sections && isPlainObject(sections.settings) ? sections.settings : {};
+
+    const rawDict = letterPairsSection.word ?? value.dict;
+    const rawCornerFormulaDict = letterPairsSection.corner ?? value.cornerFormulaDict ?? value.formulaDict;
+    const rawEdgeFormulaDict = letterPairsSection.edge ?? value.edgeFormulaDict;
+    const rawStatus = statusSection.word ?? value.status;
+    const rawCornerFormulaStatus = statusSection.corner ?? value.cornerFormulaStatus ?? value.formulaStatus;
+    const rawEdgeFormulaStatus = statusSection.edge ?? value.edgeFormulaStatus;
+    const rawTrainerRecords = trainerSection.records ?? value.trainerRecords;
+    const rawChars = settingsSection.chars ?? value.chars;
+    const rawLang = settingsSection.lang ?? value.lang;
+
+    const knownKeys = [
+        rawDict,
+        rawCornerFormulaDict,
+        rawEdgeFormulaDict,
+        rawStatus,
+        rawCornerFormulaStatus,
+        rawEdgeFormulaStatus,
+        rawTrainerRecords,
+        rawChars,
+        rawLang
+    ];
+    const hasKnownKey = knownKeys.some((sectionValue) => sectionValue != null);
+    if (!hasKnownKey) throw new Error('Unknown backup format');
+
+    const normalizedChars = rawChars == null ? null : sanitizeChars(rawChars);
+    if (rawChars != null && !normalizedChars) throw new Error('Invalid chars');
+
+    const normalizedLang = rawLang === 'zh-TW' || rawLang === 'en' ? rawLang : null;
+
+    return {
+        dict: sanitizeStringMap(rawDict),
+        cornerFormulaDict: sanitizeStringMap(rawCornerFormulaDict),
+        edgeFormulaDict: sanitizeStringMap(rawEdgeFormulaDict),
+        status: sanitizeStatusMap(rawStatus),
+        cornerFormulaStatus: sanitizeStatusMap(rawCornerFormulaStatus),
+        edgeFormulaStatus: sanitizeStatusMap(rawEdgeFormulaStatus),
+        trainerRecords: sanitizeTrainerRecords(rawTrainerRecords),
+        chars: normalizedChars,
+        lang: normalizedLang
+    };
+}
+
+function clearAppStorageData() {
+    APP_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+}
+
+function getTrainerRecords() {
+    return sanitizeTrainerRecords(readStoredJson(TRAINER_RECORDS_KEY, []));
+}
+
+function normalizeTrainerAlgorithmType(type = 'corner') {
+    return type === 'edge' ? 'edge' : 'corner';
+}
+
+function getTrainerSessionRecords(type = currentTrainerAlgorithmType) {
+    const sessionType = normalizeTrainerAlgorithmType(type);
+    return trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) === sessionType);
+}
+
+function getLatestTrainerSessionRecord(type = currentTrainerAlgorithmType) {
+    return getTrainerSessionRecords(type)[0] || null;
+}
+
+function syncLatestTrainerRecordId() {
+    latestTrainerRecordId = getLatestTrainerSessionRecord()?.id || null;
+    return latestTrainerRecordId;
+}
+
+function resetTrainerScrambleNavigation() {
+    trainerScrambleNavigation = {
+        corner: { items: [], index: -1 },
+        edge: { items: [], index: -1 }
+    };
+    trainerAlgorithmDrawState = {
+        corner: {},
+        edge: {}
+    };
+    trainerPairDrawState = {
+        corner: { signature: '', total: 0, drawOrder: [] },
+        edge: { signature: '', total: 0, drawOrder: [] }
+    };
+    updateTrainerScrambleNavButtons();
+}
+
+function saveTrainerRecords(records) {
+    trainerRecords = records.slice();
+    syncLatestTrainerRecordId();
+    trainerDeleteConfirmArmed = false;
+    if (expandedTrainerRecordId && !trainerRecords.some((record) => record.id === expandedTrainerRecordId)) {
+        expandedTrainerRecordId = null;
+    }
+    if (trainerHistoryDeleteConfirmRecordId && !trainerRecords.some((record) => record.id === trainerHistoryDeleteConfirmRecordId)) {
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
+    localStorage.setItem(TRAINER_RECORDS_KEY, JSON.stringify(trainerRecords));
+    renderTrainerRecords();
+}
+
+function migrateLegacyFormulaData() {
+    const hasCornerFormula = !!localStorage.getItem(CORNER_FORMULA_STORAGE_KEY);
+    const hasCornerStatus = !!localStorage.getItem(CORNER_FORMULA_STATUS_KEY);
+    const legacyFormula = readStoredJson(LEGACY_FORMULA_STORAGE_KEY, {});
+    const legacyStatus = readStoredJson(LEGACY_FORMULA_STATUS_KEY, {});
+
+    if (!hasCornerFormula && Object.keys(legacyFormula).length > 0) {
+        localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(legacyFormula));
+    }
+    if (!hasCornerStatus && Object.keys(legacyStatus).length > 0) {
+        localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(legacyStatus));
+    }
+}
+
+function completeBootTransition() {
+    if (bootTransitionCompleted) return;
+    bootTransitionCompleted = true;
+
+    const body = document.body;
+    const overlay = document.getElementById('boot-overlay');
+
+    if (body) body.classList.remove('app-booting');
+    if (!overlay) return;
+
+    overlay.classList.add('is-exiting');
+    window.setTimeout(() => {
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 380);
+}
+
+function init() {
+    if (appInitCompleted) return;
+
+    const savedChars = sanitizeChars(readStoredJson(CHARS_KEY, null));
+    if (savedChars) chars = savedChars;
+    if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
+    trainerRecords = getTrainerRecords();
+    syncLatestTrainerRecordId();
+    resetTrainerScrambleNavigation();
+    migrateLegacyFormulaData();
+    currentTab = document.querySelector('.view-section.active')?.id?.replace('view-', '') || 'list';
+    initUI(); setupDynamicUI(); enhanceMemoryCardLayout(); applyLanguage(); updateLayoutMode();
+    setupEventListeners();
+    updateMemoryContentModeButtons();
+    updateTrainerAlgorithmButtons();
+    renderTrainerRecords();
+    generateTrainerScramble({ silent: true });
+    appInitCompleted = true;
+    completeBootTransition();
+}
+
+function bootApp() {
+    if (appInitCompleted) return;
+
+    try {
+        init();
+    } catch (error) {
+        console.error('App initialization failed:', error);
+        // Keep the app recoverable instead of showing an uninitialized static shell forever.
+        appInitCompleted = false;
+
+        try {
+            chars = [...CHARS_ZH];
+            currentLang = localStorage.getItem(LANG_KEY) || 'zh-TW';
+            init();
+        } catch (retryError) {
+            console.error('App initialization retry failed:', retryError);
+            completeBootTransition();
+        }
+    }
+}
+
+function setupEventListeners() {
+    document.addEventListener('click', function (e) {
+        const targetEl = e.target instanceof Element ? e.target : null;
+
+        if (!targetEl || !targetEl.closest('.dropdown-wrapper')) {
+            closeAllDropdowns();
+        }
+
+        if (!targetEl || !targetEl.closest('#trainer-history-clear-group')) {
+            setTrainerClearMenuOpen(false);
+        }
+
+        const activeTab = document.querySelector('.view-section.active')?.id;
+        if (activeTab !== 'view-trainer') return;
+        if (!expandedTrainerRecordId) return;
+        if (targetEl && targetEl.closest('#trainer-history-clear-group')) return;
+        if (targetEl && targetEl.closest('#trainer-history .trainer-history-item')) return;
+
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+        renderTrainerRecords();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        const activeTab = document.querySelector('.view-section.active')?.id;
+        if (activeTab === 'view-trainer' && handleTrainerKeyDown(e)) return;
+        if (e.code === 'Space' || e.key === 'Enter') {
+            if (isEditableElement(document.activeElement)) return;
+            e.preventDefault(); triggerAction(activeTab);
+        }
+    });
+
+    document.addEventListener('keyup', function (e) {
+        const activeTab = document.querySelector('.view-section.active')?.id;
+        if (activeTab === 'view-trainer') handleTrainerKeyUp(e);
+    });
+
+    const trainerTimerEl = document.getElementById('trainer-timer');
+    if (trainerTimerEl) {
+        trainerTimerEl.addEventListener('click', handleTrainerTimerTap);
+    }
+    const trainerCardEl = document.querySelector('#view-trainer .trainer-card');
+    if (trainerCardEl) {
+        trainerCardEl.addEventListener('click', handleTrainerCardTap);
+        trainerCardEl.addEventListener('touchstart', handleTrainerCardTouchStart, { passive: false });
+        trainerCardEl.addEventListener('touchmove', handleTrainerCardTouchMove, { passive: true });
+        trainerCardEl.addEventListener('touchend', handleTrainerCardTouchEnd, { passive: false });
+        trainerCardEl.addEventListener('touchcancel', handleTrainerCardTouchCancel, { passive: true });
+    }
+
+    const listContainer = document.getElementById('grid-area');
+    listContainer.addEventListener('input', (e) => {
+        if (e.target.matches('.pair-input')) {
+            const pair = e.target.dataset.pair;
+            savePairDataDebounced(pair, e.target.value, e.target.dataset.store || 'word');
+        }
+    });
+
+    const formulaContainer = document.getElementById('formula-area');
+    formulaContainer.addEventListener('input', (e) => {
+        if (e.target.matches('.formula-input')) {
+            const pair = e.target.dataset.pair;
+            savePairDataDebounced(pair, e.target.value, e.target.dataset.store || getCurrentListContentMode());
+        }
+    });
+
+    const matrixContainer = document.getElementById('matrix-area');
+    matrixContainer.addEventListener('input', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            const pair = e.target.dataset.pair;
+            savePairDataDebounced(pair, e.target.value, e.target.dataset.store || 'word');
+        }
+    });
+    matrixContainer.addEventListener('focusin', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            handleMatrixFocus(e.target);
+        }
+    });
+    matrixContainer.addEventListener('focusout', (e) => {
+        if (e.target.matches('.matrix-input')) {
+            handleMatrixBlur();
+        }
+    });
+    matrixContainer.addEventListener('click', (e) => {
+        if (e.target.matches('.btn-diagonal-check')) {
+            const pair = e.target.dataset.pair;
+            const char = e.target.dataset.char;
+            const contentMode = e.target.dataset.store || 'word';
+            const input = e.target.previousElementSibling;
+            const d = getContentDict(contentMode);
+            d[pair] = char;
+            saveContentDict(contentMode, d);
+            input.value = char;
+        } else if (e.target.matches('.matrix-input')) {
+            const pair = e.target.dataset.pair;
+            // 讓 currentMatrixPair 保持為最後一個點擊的，以便兼容舊邏輯（若有的話）
+            currentMatrixPair = pair;
+            const td = e.target.closest('td');
+            toggleMatrixSelection(pair, td);
+        }
+    });
+}
+
+function updateLayoutMode() {
+    if (chars.includes('A') || chars.includes('a')) { document.body.classList.remove('mode-zh'); document.body.classList.add('mode-en'); }
+    else { document.body.classList.remove('mode-en'); document.body.classList.add('mode-zh'); }
+}
+
+function initUI() {
+    const listSel = document.getElementById('char-select');
+    if (!listSel) return;
+
+    listSel.innerHTML = '';
+    chars.forEach(c => { let opt1 = document.createElement('option'); opt1.value = c; opt1.innerText = `${c.toUpperCase()}`; listSel.appendChild(opt1); });
+
+    // Init checkboxes for Start/End in Memory and Trainer
+    renderCheckboxes('mem-start-range-grid', 'mem_start');
+    renderCheckboxes('mem-end-range-grid', 'mem_end');
+    renderCheckboxes('trainer-start-range-grid', 'trainer_start');
+    renderCheckboxes('trainer-end-range-grid', 'trainer_end');
+
+    updateDropdownLabel('mem_start');
+    updateDropdownLabel('mem_end');
+    updateDropdownLabel('trainer_start');
+    updateDropdownLabel('trainer_end');
+}
+
+function setupDynamicUI() {
+    const charSelect = document.getElementById('char-select');
+    if (charSelect) {
+        charSelect.onchange = renderCurrentListView;
+    }
+
+    const modeRow = document.querySelector('#view-list .control-panel .control-row');
+    const listButton = document.getElementById('btn-mode-list');
+    const matrixButton = document.getElementById('btn-mode-matrix');
+    let wordButton = document.getElementById('btn-mode-content-word');
+    let algorithmButton = document.getElementById('btn-mode-content-formula');
+    let cornerAlgorithmButton = document.getElementById('btn-algorithm-type-corner');
+    let edgeAlgorithmButton = document.getElementById('btn-algorithm-type-edge');
+
+    if (!wordButton) {
+        wordButton = document.createElement('button');
+        wordButton.id = 'btn-mode-content-word';
+        wordButton.className = 'action-btn';
+    }
+    if (!algorithmButton) {
+        algorithmButton = document.createElement('button');
+        algorithmButton.id = 'btn-mode-content-formula';
+        algorithmButton.className = 'action-btn';
+    }
+    if (!cornerAlgorithmButton) {
+        cornerAlgorithmButton = document.createElement('button');
+        cornerAlgorithmButton.id = 'btn-algorithm-type-corner';
+        cornerAlgorithmButton.className = 'action-btn';
+    }
+    if (!edgeAlgorithmButton) {
+        edgeAlgorithmButton = document.createElement('button');
+        edgeAlgorithmButton.id = 'btn-algorithm-type-edge';
+        edgeAlgorithmButton.className = 'action-btn';
+    }
+
+    if (listButton) {
+        listButton.onclick = () => setListLayoutMode('list');
+        listButton.innerHTML = `<span data-i18n="switch_list">${t('switch_list')}</span>`;
+    }
+    if (matrixButton) {
+        matrixButton.onclick = () => setListLayoutMode('matrix');
+        matrixButton.innerHTML = `<span data-i18n="switch_matrix">${t('switch_matrix')}</span>`;
+    }
+
+    wordButton.onclick = () => setListContentMode('word');
+    wordButton.innerHTML = `<span data-i18n="switch_words">${t('switch_words')}</span>`;
+
+    algorithmButton.onclick = () => setListContentMode('formula');
+    algorithmButton.innerHTML = `<span data-i18n="switch_algorithm">${t('switch_algorithm')}</span>`;
+
+    cornerAlgorithmButton.onclick = () => setAlgorithmType('corner');
+    cornerAlgorithmButton.innerHTML = `<span data-i18n="algorithm_corners">${t('algorithm_corners')}</span>`;
+
+    edgeAlgorithmButton.onclick = () => setAlgorithmType('edge');
+    edgeAlgorithmButton.innerHTML = `<span data-i18n="algorithm_edges">${t('algorithm_edges')}</span>`;
+
+    if (modeRow) {
+        modeRow.className = 'list-mode-switcher';
+        modeRow.innerHTML = '';
+        modeRow.appendChild(createListModeGroup('switch_layout', [listButton, matrixButton], 'list-mode-group-layout'));
+        modeRow.appendChild(createListModeGroup('switch_content', [wordButton, algorithmButton], 'list-mode-group-content'));
+
+        let algorithmTypeSwitcher = document.getElementById('algorithm-type-switcher');
+        if (!algorithmTypeSwitcher) {
+            algorithmTypeSwitcher = document.createElement('div');
+            algorithmTypeSwitcher.id = 'algorithm-type-switcher';
+            algorithmTypeSwitcher.className = 'algorithm-type-switcher hidden';
+            modeRow.insertAdjacentElement('afterend', algorithmTypeSwitcher);
+        }
+        algorithmTypeSwitcher.innerHTML = '';
+        algorithmTypeSwitcher.appendChild(createListModeGroup('algorithm_type', [cornerAlgorithmButton, edgeAlgorithmButton], 'algorithm-type-group'));
+    }
+
+    const listControls = document.getElementById('list-mode-controls');
+    if (listControls && !document.getElementById('formula-mode-hint')) {
+        const formulaHint = document.createElement('div');
+        formulaHint.id = 'formula-mode-hint';
+        formulaHint.className = 'mode-hint hidden';
+        formulaHint.setAttribute('data-i18n', 'hint_formula_edit');
+        formulaHint.innerText = t('hint_formula_edit');
+        listControls.insertAdjacentElement('afterend', formulaHint);
+    }
+
+    const gridArea = document.getElementById('grid-area');
+    if (gridArea && !document.getElementById('formula-area')) {
+        const formulaArea = document.createElement('div');
+        formulaArea.id = 'formula-area';
+        formulaArea.className = 'grid-container formula-grid hidden';
+        gridArea.insertAdjacentElement('afterend', formulaArea);
+    }
+
+    const matrixFooter = document.getElementById('matrix-footer');
+    if (matrixFooter) {
+        matrixFooter.classList.add('matrix-footer');
+        matrixFooter.innerHTML = `
+            <span class="matrix-footer-label" data-i18n="btn_reset_color">${t('btn_reset_color')}</span>
+            <div class="matrix-footer-actions">
+                <button class="btn-grade" onclick="resetAllColors('all')" data-i18n="btn_reset_all">${t('btn_reset_all')}</button>
+                <button class="btn-grade bg-green" onclick="resetAllColors('green')" data-i18n="fb_good">${t('fb_good')}</button>
+                <button class="btn-grade bg-yellow" onclick="resetAllColors('yellow')" data-i18n="fb_slow">${t('fb_slow')}</button>
+                <button class="btn-grade bg-red" onclick="resetAllColors('red')" data-i18n="fb_wrong">${t('fb_wrong')}</button>
+                <button class="btn-grade bg-gray" onclick="resetAllColors('gray')" data-i18n="btn_hide">${t('btn_hide')}</button>
+            </div>
+        `;
+    }
+
+    const memoryPanel = document.querySelector('#view-memory .control-panel');
+    if (memoryPanel && !document.getElementById('btn-mem-content-word')) {
+        const modeRow = document.createElement('div');
+        modeRow.className = 'control-row control-row-wrap memory-mode-row';
+        modeRow.id = 'memory-mode-row';
+
+        const leftGroup = document.createElement('div');
+        leftGroup.className = 'memory-mode-group memory-mode-group-left';
+
+        const rightGroup = document.createElement('div');
+        rightGroup.className = 'memory-mode-group memory-mode-group-right';
+
+        const wordButton = document.createElement('button');
+        wordButton.id = 'btn-mem-content-word';
+        wordButton.className = 'action-btn';
+        wordButton.onclick = () => toggleMemoryContentMode('word');
+        wordButton.setAttribute('data-i18n', 'study_word_mode');
+        wordButton.innerText = t('study_word_mode');
+
+        const cornerButton = document.createElement('button');
+        cornerButton.id = 'btn-mem-content-corner';
+        cornerButton.className = 'action-btn';
+        cornerButton.onclick = () => toggleMemoryContentMode('corner');
+        cornerButton.setAttribute('data-i18n', 'study_corner_mode');
+        cornerButton.innerText = t('study_corner_mode');
+
+        const edgeButton = document.createElement('button');
+        edgeButton.id = 'btn-mem-content-edge';
+        edgeButton.className = 'action-btn';
+        edgeButton.onclick = () => toggleMemoryContentMode('edge');
+        edgeButton.setAttribute('data-i18n', 'study_edge_mode');
+        edgeButton.innerText = t('study_edge_mode');
+
+        leftGroup.appendChild(wordButton);
+        leftGroup.appendChild(cornerButton);
+        rightGroup.appendChild(edgeButton);
+
+        modeRow.appendChild(leftGroup);
+        modeRow.appendChild(rightGroup);
+
+        const rangeRow = memoryPanel.querySelector('.control-row');
+        if (rangeRow) rangeRow.insertAdjacentElement('afterend', modeRow);
+        else memoryPanel.insertBefore(modeRow, memoryPanel.firstElementChild);
+    }
+}
+
+function enhanceMemoryCardLayout() {
+    const memoryCard = document.getElementById('memory-card');
+    const gradingArea = document.getElementById('mem-grading-area');
+    const questionEl = document.getElementById('mem-q');
+    const answerEl = document.getElementById('mem-a');
+    const hintEl = document.getElementById('mem-hint');
+
+    if (!memoryCard || !gradingArea || !questionEl || !answerEl || !hintEl) return;
+    if (memoryCard.querySelector('.flashcard-stage')) return;
+
+    const stage = document.createElement('div');
+    stage.className = 'flashcard-stage';
+
+    const scene = document.createElement('div');
+    scene.className = 'flashcard-3d';
+
+    const front = document.createElement('div');
+    front.className = 'flashcard-face flashcard-front';
+
+    const back = document.createElement('div');
+    back.className = 'flashcard-face flashcard-back';
+
+    hintEl.classList.add('flashcard-subtext');
+    answerEl.classList.add('flashcard-answer');
+
+    front.appendChild(questionEl);
+    front.appendChild(hintEl);
+    back.appendChild(answerEl);
+    back.appendChild(gradingArea);
+    scene.appendChild(front);
+    scene.appendChild(back);
+    stage.appendChild(scene);
+    memoryCard.appendChild(stage);
+}
+
+function createListModeGroup(labelKey, buttons, groupId) {
+    const group = document.createElement('div');
+    group.id = groupId;
+    group.className = 'list-mode-group';
+
+    const label = document.createElement('div');
+    label.className = 'list-mode-group-label';
+    label.setAttribute('data-i18n', labelKey);
+    label.innerText = t(labelKey);
+
+    const actions = document.createElement('div');
+    actions.className = 'list-mode-group-actions';
+
+    buttons.filter(Boolean).forEach((button) => {
+        button.classList.add('mode-choice-btn');
+        actions.appendChild(button);
+    });
+
+    group.appendChild(label);
+    group.appendChild(actions);
+    return group;
+}
+
+function setActionButtonActive(button, isActive) {
+    if (!button) return;
+    button.style.borderColor = '';
+    button.style.color = '';
+    button.style.backgroundColor = '';
+    button.classList.toggle('is-active', isActive);
+}
+
+function normalizeContentModes(contentModes = ['word']) {
+    const modes = Array.isArray(contentModes) ? contentModes : [contentModes];
+    return [...new Set(modes.filter(Boolean))];
+}
+
+function getSelectedMemoryContentModes() {
+    return normalizeContentModes(currentMemoryContentModes);
+}
+
+function getMemoryStatusTargetModes(contentModes = ['word']) {
+    const normalizedModes = normalizeContentModes(contentModes);
+    const algorithmModes = normalizedModes.filter(isAlgorithmContentMode);
+    return algorithmModes.length > 0 ? algorithmModes : normalizedModes;
+}
+
+function isMemoryContentModeActive(mode) {
+    return getSelectedMemoryContentModes().includes(mode);
+}
+
+function getContentLabelKey(mode) {
+    if (mode === 'corner') return 'content_corner_label';
+    if (mode === 'edge') return 'content_edge_label';
+    return 'content_word_label';
+}
+
+function getBuiltInAlgorithmMap(contentMode = 'corner') {
+    return isAlgorithmContentMode(contentMode) ? (BUILT_IN_ALGORITHMS[contentMode] || {}) : {};
+}
+
+function getPairIndices(pair) {
+    for (let startIndex = 0; startIndex < chars.length; startIndex++) {
+        const startLabel = chars[startIndex];
+        if (!pair.startsWith(startLabel)) continue;
+
+        const endLabel = pair.slice(startLabel.length);
+        const endIndex = chars.indexOf(endLabel);
+        if (endIndex !== -1) return [startIndex, endIndex];
+    }
+
+    return [-1, -1];
+}
+
+function isSameCharPair(pair) {
+    const [startIndex, endIndex] = getPairIndices(pair);
+    return startIndex !== -1 && startIndex === endIndex;
+}
+
+function getBuiltInAlgorithm(pair, contentMode = 'corner') {
+    if (!isAlgorithmContentMode(contentMode)) return '';
+
+    const [startIndex, endIndex] = getPairIndices(pair);
+    if (startIndex === -1 || endIndex === -1) return '';
+
+    const value = getBuiltInAlgorithmMap(contentMode)[`${startIndex}-${endIndex}`] || '';
+    if (/^not found\.?$/i.test(String(value).trim())) return '';
+    return value;
+}
+
+function getAlgorithmPlaceholder(pair, contentMode = 'corner') {
+    return getBuiltInAlgorithm(pair, contentMode) || t('ph_algorithm');
+}
+
+function getNoDataErrorKey(contentModes = ['word']) {
+    return normalizeContentModes(contentModes).every(isAlgorithmContentMode) ? 'alert_no_algorithm_data' : 'alert_no_data';
+}
+
+function getPairContentValue(pair, contentMode, options = {}) {
+    const dict = getContentDict(contentMode);
+    const storedValue = (dict[pair] || '').trim();
+    if (storedValue) return storedValue;
+
+    if (isAlgorithmContentMode(contentMode)) {
+        const builtInValue = options.includeBuiltIn === false ? '' : getBuiltInAlgorithm(pair, contentMode);
+        if (builtInValue) return builtInValue;
+
+        if (options.includePlaceholder && !isSameCharPair(pair)) {
+            return getAlgorithmPlaceholder(pair, contentMode);
+        }
+    }
+
+    return '';
+}
+
+function splitTopLevelExpression(expression, separator) {
+    let depth = 0;
+
+    for (let index = 0; index < expression.length; index++) {
+        const char = expression[index];
+        if (char === '[') depth += 1;
+        else if (char === ']') depth -= 1;
+        else if (char === separator && depth === 0) {
+            return [
+                expression.slice(0, index).trim(),
+                expression.slice(index + 1).trim()
+            ];
+        }
+    }
+
+    return null;
+}
+
+function parseMoveToken(token) {
+    const normalized = String(token || '').trim();
+    if (!normalized) return null;
+
+    const match = normalized.match(/^([A-Za-z]+w?)(2)?('?){0,1}$/);
+    if (match) {
+        const base = match[1];
+        const amount = match[2] ? 2 : (match[3] ? 3 : 1);
+        return { base, amount };
+    }
+
+    const altMatch = normalized.match(/^([A-Za-z]+w?)('?)(2)$/);
+    if (altMatch) {
+        return { base: altMatch[1], amount: 2 };
+    }
+
+    return null;
+}
+
+function normalizeMoveToken({ base, amount }) {
+    if (amount === 2) return `${base}2`;
+    if (amount === 3) return `${base}'`;
+    return base;
+}
+
+function parseMoveSequence(sequence) {
+    const normalized = String(sequence || '').trim();
+    if (!normalized) return [];
+
+    return normalized.split(/\s+/).map((token) => {
+        const parsed = parseMoveToken(token);
+        if (!parsed) throw new Error(`Invalid move token: ${token}`);
+        return normalizeMoveToken(parsed);
+    });
+}
+
+function invertMoveToken(token) {
+    const parsed = parseMoveToken(token);
+    if (!parsed) throw new Error(`Invalid move token: ${token}`);
+    return normalizeMoveToken({
+        base: parsed.base,
+        amount: parsed.amount === 2 ? 2 : (parsed.amount === 3 ? 1 : 3)
+    });
+}
+
+function invertMoveSequence(moves = []) {
+    return moves.slice().reverse().map(invertMoveToken);
+}
+
+function mergeAdjacentSameBaseMoves(moves = []) {
+    const normalized = [];
+
+    moves.forEach((move) => {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) {
+            normalized.push(move);
+            return;
+        }
+
+        const currentMove = normalizeMoveToken(parsedMove);
+        const lastMove = normalized[normalized.length - 1];
+        const parsedLastMove = parseMoveToken(lastMove);
+
+        if (!parsedLastMove || parsedLastMove.base !== parsedMove.base) {
+            normalized.push(currentMove);
+            return;
+        }
+
+        const combinedAmount = (parsedLastMove.amount + parsedMove.amount) % 4;
+        normalized.pop();
+        if (combinedAmount !== 0) {
+            normalized.push(normalizeMoveToken({
+                base: parsedMove.base,
+                amount: combinedAmount
+            }));
+        }
+    });
+
+    return normalized;
+}
+
+function getMoveAxis(base = '') {
+    const face = String(base || '').trim().charAt(0).toUpperCase();
+    if (face === 'U' || face === 'D') return 'UD';
+    if (face === 'R' || face === 'L') return 'RL';
+    if (face === 'F' || face === 'B') return 'FB';
+    return null;
+}
+
+function collapseSameAxisMoves(parsedMoves = []) {
+    if (parsedMoves.length <= 1) {
+        return parsedMoves.map((move) => normalizeMoveToken(move));
+    }
+
+    const amountByBase = new Map();
+    const order = [];
+    parsedMoves.forEach((move) => {
+        if (!amountByBase.has(move.base)) {
+            amountByBase.set(move.base, 0);
+            order.push(move.base);
+        }
+        amountByBase.set(move.base, (amountByBase.get(move.base) + move.amount) % 4);
+    });
+
+    const collapsed = [];
+    order.forEach((base) => {
+        const amount = amountByBase.get(base);
+        if (!amount) return;
+        collapsed.push(normalizeMoveToken({ base, amount }));
+    });
+    return collapsed;
+}
+
+function normalizeTrainerScrambleMoves(moves = []) {
+    const adjacentNormalized = mergeAdjacentSameBaseMoves(moves);
+    const normalized = [];
+    let axisBuffer = [];
+    let currentAxis = null;
+
+    const flushAxisBuffer = () => {
+        if (axisBuffer.length === 0) return;
+        normalized.push(...collapseSameAxisMoves(axisBuffer));
+        axisBuffer = [];
+        currentAxis = null;
+    };
+
+    adjacentNormalized.forEach((move) => {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) {
+            flushAxisBuffer();
+            normalized.push(move);
+            return;
+        }
+
+        const axis = getMoveAxis(parsedMove.base);
+        if (!axis) {
+            flushAxisBuffer();
+            normalized.push(normalizeMoveToken(parsedMove));
+            return;
+        }
+
+        if (currentAxis && axis !== currentAxis) {
+            flushAxisBuffer();
+        }
+
+        currentAxis = axis;
+        axisBuffer.push(parsedMove);
+    });
+
+    flushAxisBuffer();
+    return mergeAdjacentSameBaseMoves(normalized);
+}
+
+function expandAlgorithmExpression(expression) {
+    const normalized = String(expression || '').trim();
+    if (!normalized) return [];
+
+    const conjugateParts = splitTopLevelExpression(normalized, ':');
+    if (conjugateParts) {
+        const setupMoves = expandAlgorithmExpression(conjugateParts[0]);
+        const bodyMoves = expandAlgorithmExpression(conjugateParts[1]);
+        return [...setupMoves, ...bodyMoves, ...invertMoveSequence(setupMoves)];
+    }
+
+    if (normalized.startsWith('[') && normalized.endsWith(']')) {
+        const inner = normalized.slice(1, -1).trim();
+        const commutatorParts = splitTopLevelExpression(inner, ',');
+        if (!commutatorParts) throw new Error(`Invalid commutator: ${normalized}`);
+
+        const aMoves = expandAlgorithmExpression(commutatorParts[0]);
+        const bMoves = expandAlgorithmExpression(commutatorParts[1]);
+        return [...aMoves, ...bMoves, ...invertMoveSequence(aMoves), ...invertMoveSequence(bMoves)];
+    }
+
+    return parseMoveSequence(normalized);
+}
+
+function getAvailablePairContentModes(pair, contentModes = ['word'], options = {}) {
+    return normalizeContentModes(contentModes).filter((mode) => {
+        const value = getPairContentValue(pair, mode, options);
+        if (!value) return false;
+        const status = getPairData(pair, mode);
+        return !(status && status.color === 'gray');
+    });
+}
+
+function formatMemoryAnswer(pair, contentModes = ['word']) {
+    const answerOptions = { includePlaceholder: true };
+    const availableModes = getAvailablePairContentModes(pair, contentModes, answerOptions);
+    if (availableModes.length === 0) return "N/A";
+
+    if (availableModes.length === 1) {
+        return getPairContentValue(pair, availableModes[0], answerOptions);
+    }
+
+    return availableModes.map((mode) => {
+        const title = t(getContentLabelKey(mode));
+        const value = getPairContentValue(pair, mode, answerOptions);
+        return `${title}: ${value}`;
+    }).join('\n\n');
+}
+
+function isMatrixListView(mode = currentListViewMode) {
+    return mode === 'matrix' || mode === 'formula-matrix';
+}
+
+function isFormulaListView(mode = currentListViewMode) {
+    return mode === 'formula' || mode === 'formula-matrix';
+}
+
+function getCurrentListContentGroup(mode = currentListViewMode) {
+    return isFormulaListView(mode) ? 'formula' : 'word';
+}
+
+function getCurrentListContentMode(mode = currentListViewMode) {
+    return isFormulaListView(mode) ? currentAlgorithmType : 'word';
+}
+
+function getCurrentListLayoutMode(mode = currentListViewMode) {
+    return isMatrixListView(mode) ? 'matrix' : 'list';
+}
+
+function buildListViewMode(layout = 'list', contentGroup = 'word') {
+    if (contentGroup === 'formula') {
+        return layout === 'matrix' ? 'formula-matrix' : 'formula';
+    }
+    return layout === 'matrix' ? 'matrix' : 'list';
+}
+
+function setListLayoutMode(layout) {
+    toggleViewMode(buildListViewMode(layout, getCurrentListContentGroup()));
+}
+
+function setListContentMode(contentGroup) {
+    toggleViewMode(buildListViewMode(getCurrentListLayoutMode(), contentGroup));
+}
+
+function setAlgorithmType(type) {
+    currentAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    toggleViewMode(currentListViewMode);
+}
+
+function renderCurrentListView() {
+    if (isMatrixListView()) renderMatrix(getCurrentListContentMode());
+    else if (getCurrentListContentGroup() === 'formula') renderFormulaList();
+    else renderList();
+}
+
+function updateMemoryContentModeButtons() {
+    setActionButtonActive(document.getElementById('btn-mem-content-word'), isMemoryContentModeActive('word'));
+    setActionButtonActive(document.getElementById('btn-mem-content-corner'), isMemoryContentModeActive('corner'));
+    setActionButtonActive(document.getElementById('btn-mem-content-edge'), isMemoryContentModeActive('edge'));
+}
+
+function updateTrainerAlgorithmButtons() {
+    setActionButtonActive(document.getElementById('btn-trainer-type-corner'), currentTrainerAlgorithmType === 'corner');
+    setActionButtonActive(document.getElementById('btn-trainer-type-edge'), currentTrainerAlgorithmType === 'edge');
+}
+
+function updateTrainerTypeBadge() {
+    const modeLabel = t(currentTrainerAlgorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    const displayText = modeLabel;
+    const badge = document.getElementById('trainer-type-badge');
+    const statusEl = document.getElementById('trainer-status');
+    if (badge) badge.innerText = displayText;
+    if (statusEl) statusEl.innerText = displayText;
+}
+
+function updateAlgorithmTypeButtons() {
+    setActionButtonActive(document.getElementById('btn-algorithm-type-corner'), currentAlgorithmType === 'corner');
+    setActionButtonActive(document.getElementById('btn-algorithm-type-edge'), currentAlgorithmType === 'edge');
+}
+
+function toggleMemoryContentMode(mode) {
+    const selectedModes = getSelectedMemoryContentModes();
+    const isEdgeMode = mode === 'edge';
+    const hasEdgeMode = selectedModes.includes('edge');
+
+    if (isEdgeMode) {
+        currentMemoryContentModes = hasEdgeMode && selectedModes.length === 1 ? selectedModes : ['edge'];
+    } else if (selectedModes.includes(mode)) {
+        const nonEdgeModes = selectedModes.filter((item) => item !== 'edge');
+        if (nonEdgeModes.length === 1) return;
+        currentMemoryContentModes = nonEdgeModes.filter((item) => item !== mode);
+    } else {
+        const baseModes = hasEdgeMode ? [] : selectedModes.filter((item) => item !== 'edge');
+        currentMemoryContentModes = [...baseModes, mode];
+    }
+
+    updateMemoryContentModeButtons();
+    nextMemoryCard();
+}
+
+function setTrainerAlgorithmType(type) {
+    currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    currentTrainerAlgorithm = '';
+    clearTrainerInlineStates();
+    updateTrainerAlgorithmButtons();
+    updateTrainerTypeBadge();
+    renderTrainerRecords();
+    updateTrainerScrambleNavButtons();
+    generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+}
+
+function getTrainerCandidatePairs() {
+    const startChars = getSelectedRanges('trainer_start');
+    const endChars = getSelectedRanges('trainer_end');
+
+    if (startChars.length === 0 || endChars.length === 0) {
+        return { error: 'alert_sel_range' };
+    }
+
+    const pairs = [];
+    chars.forEach((start) => {
+        if (!startChars.includes(start)) return;
+        chars.forEach((end) => {
+            if (!endChars.includes(end)) return;
+
+            const pair = start + end;
+            if (!getPairContentValue(pair, currentTrainerAlgorithmType)) return;
+
+            const status = getPairData(pair, currentTrainerAlgorithmType);
+            if (status && status.color === 'gray') return;
+
+            pairs.push(pair);
+        });
+    });
+
+    if (pairs.length === 0) {
+        return { error: 'alert_no_algorithm_data' };
+    }
+
+    return { pairs };
+}
+
+function getTrainerPairScrambleMoves(pair, algorithmText = '') {
+    const selectedAlgorithmText = String(algorithmText || '').trim() || getPairContentValue(pair, currentTrainerAlgorithmType);
+    if (!selectedAlgorithmText) return [];
+    const expandedMoves = expandAlgorithmExpression(selectedAlgorithmText);
+    return invertMoveSequence(expandedMoves);
+}
+
+function getTrainerPairAlgorithmCandidates(pair) {
+    const algorithmText = getPairContentValue(pair, currentTrainerAlgorithmType);
+    const normalized = String(algorithmText || '').replace(/\r/g, '').trim();
+    if (!normalized) return [];
+
+    const lineCandidates = normalized
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lineCandidates.length > 1) return lineCandidates;
+    return [normalized];
+}
+
+function getTrainerDrawStateStore(type = currentTrainerAlgorithmType) {
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerAlgorithmDrawState[algorithmType]) trainerAlgorithmDrawState[algorithmType] = {};
+    return trainerAlgorithmDrawState[algorithmType];
+}
+
+function buildTrainerAlgorithmCycleSignature(algorithmEntries = []) {
+    return algorithmEntries.map((entry) => entry.algorithm).join('\u241E');
+}
+
+function shuffleTrainerArray(items = []) {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index--) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        const current = result[index];
+        result[index] = result[randomIndex];
+        result[randomIndex] = current;
+    }
+    return result;
+}
+
+function chooseTrainerAlgorithmFromPool(pair, algorithmEntries = []) {
+    if (!pair || algorithmEntries.length === 0) return null;
+
+    const store = getTrainerDrawStateStore();
+    const signature = buildTrainerAlgorithmCycleSignature(algorithmEntries);
+    let state = store[pair];
+    if (!state || state.signature !== signature || state.total !== algorithmEntries.length) {
+        state = {
+            signature,
+            total: algorithmEntries.length,
+            drawOrder: []
+        };
+        store[pair] = state;
+    }
+
+    if (state.drawOrder.length === 0) {
+        state.drawOrder = shuffleTrainerArray(algorithmEntries.map((_, index) => index));
+    }
+
+    const nextIndex = state.drawOrder.pop();
+    if (!Number.isInteger(nextIndex) || !algorithmEntries[nextIndex]) return null;
+
+    return { ...algorithmEntries[nextIndex] };
+}
+
+function getTrainerPairAlgorithmEntries(pair) {
+    const candidates = getTrainerPairAlgorithmCandidates(pair);
+    if (candidates.length === 0) return [];
+
+    const validEntries = [];
+    candidates.forEach((candidateText) => {
+        const candidateVariants = [candidateText];
+        const trimmedNumberPrefix = String(candidateText)
+            .replace(/^\s*\d+\s*[\.\)\]:：、-]\s*/, '')
+            .trim();
+        if (trimmedNumberPrefix && trimmedNumberPrefix !== candidateText) candidateVariants.push(trimmedNumberPrefix);
+
+        try {
+            let parsedEntry = null;
+            for (const candidateVariant of candidateVariants) {
+                try {
+                    const moves = getTrainerPairScrambleMoves(pair, candidateVariant);
+                    if (moves.length === 0) continue;
+                    parsedEntry = {
+                        algorithm: formatTrainerCommutatorText(candidateVariant),
+                        moves
+                    };
+                    break;
+                } catch (innerError) {
+                    // Keep trying fallback variants.
+                }
+            }
+            if (parsedEntry) validEntries.push(parsedEntry);
+        } catch (outerError) {
+            // Ignore invalid lines so a single bad algorithm does not block the whole case.
+        }
+    });
+
+    return validEntries;
+}
+
+function getTrainerPairMovesWithCycle(pair, algorithmEntries = null) {
+    const validEntries = Array.isArray(algorithmEntries) ? algorithmEntries : getTrainerPairAlgorithmEntries(pair);
+    if (validEntries.length === 0) return null;
+    return chooseTrainerAlgorithmFromPool(pair, validEntries);
+}
+
+function formatTrainerCommutatorText(text = '') {
+    return String(text || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/\[\s*/g, '[')
+        .replace(/\s*\]/g, ']');
+}
+
+function getTrainerRecordAlgorithmText(record) {
+    if (!record) return '';
+    const storedAlgorithm = formatTrainerCommutatorText(record.algorithm || '');
+    if (storedAlgorithm) return storedAlgorithm;
+
+    if (!record.pair) return '';
+    const fallbackAlgorithm = getPairContentValue(record.pair, record.algorithmType);
+    return formatTrainerCommutatorText(fallbackAlgorithm);
+}
+
+function buildTrainerPairCycleSignature(pool = []) {
+    return pool.join('\u241E');
+}
+
+function chooseTrainerPairFromPool(pool, type = currentTrainerAlgorithmType) {
+    if (!Array.isArray(pool) || pool.length === 0) return null;
+
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerPairDrawState[algorithmType]) {
+        trainerPairDrawState[algorithmType] = { signature: '', total: 0, drawOrder: [] };
+    }
+
+    const state = trainerPairDrawState[algorithmType];
+    const signature = buildTrainerPairCycleSignature(pool);
+    if (state.signature !== signature || state.total !== pool.length) {
+        state.signature = signature;
+        state.total = pool.length;
+        state.drawOrder = [];
+    }
+
+    if (state.drawOrder.length === 0) {
+        state.drawOrder = shuffleTrainerArray(pool.map((_, index) => index));
+    }
+
+    const nextIndex = state.drawOrder.pop();
+    if (!Number.isInteger(nextIndex) || !pool[nextIndex]) return pool[0];
+    return pool[nextIndex];
+}
+
+function getTrainerScrambleNavState(type = currentTrainerAlgorithmType) {
+    const algorithmType = normalizeTrainerAlgorithmType(type);
+    if (!trainerScrambleNavigation[algorithmType]) {
+        trainerScrambleNavigation[algorithmType] = { items: [], index: -1 };
+    }
+    return trainerScrambleNavigation[algorithmType];
+}
+
+function updateTrainerScrambleNavButtons() {
+    const prevBtn = document.getElementById('trainer-prev-btn');
+    if (!prevBtn) return;
+
+    const navState = getTrainerScrambleNavState();
+    prevBtn.disabled = navState.index <= 0;
+}
+
+function formatTrainerPairCaseLabel(pair = '') {
+    if (!pair) return '';
+
+    const normalizedPair = String(pair);
+    const [startIndex, endIndex] = getPairIndices(normalizedPair);
+    if (startIndex === -1 || endIndex === -1) return normalizedPair.toUpperCase();
+
+    const startLabel = chars[startIndex];
+    const endLabel = chars[endIndex];
+    if (!startLabel || !endLabel) return normalizedPair.toUpperCase();
+
+    return `${String(startLabel).toUpperCase()}${String(endLabel).toUpperCase()}`;
+}
+
+function setTrainerScrambleDisplay(scramble = '', pair = currentTrainerPair) {
+    const scrambleEl = document.getElementById('trainer-scramble');
+    if (!scrambleEl) return;
+
+    const scrambleText = String(scramble || '').trim();
+    if (!scrambleText) {
+        scrambleEl.innerText = t('trainer_scramble_placeholder');
+        return;
+    }
+
+    const caseLabel = formatTrainerPairCaseLabel(pair);
+    scrambleEl.innerText = caseLabel ? `${scrambleText} (${caseLabel})` : scrambleText;
+}
+
+function applyTrainerScrambleSnapshot(snapshot, options = {}) {
+    if (!snapshot || !snapshot.scramble) return false;
+
+    currentTrainerPair = snapshot.pair || null;
+    currentTrainerScramble = snapshot.scramble;
+    currentTrainerAlgorithm = formatTrainerCommutatorText(snapshot.algorithm || '');
+
+    setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
+    updateTrainerTypeBadge();
+
+    if (options.preserveStatus !== true) setTrainerStatus('trainer_status_idle');
+    updateTrainerScrambleNavButtons();
+    return true;
+}
+
+function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAlgorithmType, options = {}) {
+    if (!pair || !scramble) return;
+
+    const navState = getTrainerScrambleNavState(type);
+    if (navState.index < navState.items.length - 1) {
+        navState.items = navState.items.slice(0, navState.index + 1);
+    }
+
+    navState.items.push({
+        pair,
+        scramble,
+        algorithm: formatTrainerCommutatorText(options.algorithm || ''),
+        algorithmType: normalizeTrainerAlgorithmType(type)
+    });
+
+    if (navState.items.length > TRAINER_SCRAMBLE_HISTORY_LIMIT) {
+        navState.items.shift();
+    }
+
+    navState.index = navState.items.length - 1;
+    updateTrainerScrambleNavButtons();
+}
+
+function clearTrainerInlineStates() {
+    trainerDeleteConfirmArmed = false;
+    trainerHistoryDeleteConfirmRecordId = null;
+    expandedTrainerRecordId = null;
+    updateTrainerDeleteButtons();
+}
+
+function goToPreviousTrainerScramble() {
+    if (trainerTimerState === 'running') return;
+
+    const navState = getTrainerScrambleNavState();
+    if (navState.index <= 0) return;
+
+    clearTrainerInlineStates();
+    resetTrainerTimerState({ keepStatus: true, resetTimerDisplay: true });
+
+    navState.index -= 1;
+    applyTrainerScrambleSnapshot(navState.items[navState.index]);
+}
+
+function goToNextTrainerScramble() {
+    if (trainerTimerState === 'running') return;
+
+    const navState = getTrainerScrambleNavState();
+    if (navState.index < navState.items.length - 1) {
+        clearTrainerInlineStates();
+        resetTrainerTimerState({ keepStatus: true, resetTimerDisplay: true });
+
+        navState.index += 1;
+        applyTrainerScrambleSnapshot(navState.items[navState.index]);
+        return;
+    }
+
+    generateTrainerScramble();
+}
+
+function getTrainerCubeSolverConstructor() {
+    if (typeof window !== 'undefined' && typeof window.Cube === 'function') return window.Cube;
+    if (typeof Cube === 'function') return Cube;
+    return null;
+}
+
+function ensureTrainerCubeSolverReady() {
+    if (trainerCubeSolverInitState === 'ready') return true;
+    if (trainerCubeSolverInitState === 'failed') return false;
+
+    const solver = getTrainerCubeSolverConstructor();
+    if (!solver || typeof solver.initSolver !== 'function' || typeof solver.inverse !== 'function') {
+        trainerCubeSolverInitState = 'failed';
+        return false;
+    }
+
+    try {
+        solver.initSolver();
+        trainerCubeSolverInitState = 'ready';
+        return true;
+    } catch (error) {
+        trainerCubeSolverInitState = 'failed';
+        return false;
+    }
+}
+
+function normalizeTrainerCubeSolverMoveBase(base = '') {
+    const rawBase = String(base || '').trim();
+    if (!rawBase) return '';
+
+    if (/^[URFDLB]$/.test(rawBase)) return rawBase;
+
+    const lowerBase = rawBase.toLowerCase();
+    if (lowerBase === 'm') return 'M';
+    if (lowerBase === 'e') return 'E';
+    if (lowerBase === 's') return 'S';
+    if (lowerBase === 'x' || lowerBase === 'y' || lowerBase === 'z') return lowerBase;
+    if (lowerBase === 'u' || lowerBase === 'uw') return 'u';
+    if (lowerBase === 'r' || lowerBase === 'rw') return 'r';
+    if (lowerBase === 'f' || lowerBase === 'fw') return 'f';
+    if (lowerBase === 'd' || lowerBase === 'dw') return 'd';
+    if (lowerBase === 'l' || lowerBase === 'lw') return 'l';
+    if (lowerBase === 'b' || lowerBase === 'bw') return 'b';
+
+    return '';
+}
+
+function toTrainerCubeSolverMoves(moves = []) {
+    const convertedMoves = [];
+    for (const move of moves) {
+        const parsedMove = parseMoveToken(move);
+        if (!parsedMove) return null;
+
+        const normalizedBase = normalizeTrainerCubeSolverMoveBase(parsedMove.base);
+        if (!normalizedBase) return null;
+
+        convertedMoves.push(normalizeMoveToken({
+            base: normalizedBase,
+            amount: parsedMove.amount
+        }));
+    }
+    return convertedMoves;
+}
+
+function buildCubeSolverTrainerScrambleMoves(baseMoves = []) {
+    const normalizedMoves = normalizeTrainerScrambleMoves(baseMoves);
+    if (normalizedMoves.length === 0) return normalizedMoves;
+
+    if (!ensureTrainerCubeSolverReady()) return null;
+
+    const solverMoves = toTrainerCubeSolverMoves(normalizedMoves);
+    if (!solverMoves || solverMoves.length === 0) return null;
+
+    const solver = getTrainerCubeSolverConstructor();
+    if (!solver) return null;
+
+    try {
+        const cube = new solver();
+        cube.move(solverMoves.join(' '));
+
+        const solution = cube.solve(TRAINER_CUBE_SOLVER_MAX_DEPTH);
+        const scrambleText = solver.inverse(solution || '');
+        const scrambleMoves = normalizeTrainerScrambleMoves(parseMoveSequence(scrambleText));
+
+        if (scrambleMoves.length > 0) return scrambleMoves;
+    } catch (error) {
+        return null;
+    }
+
+    return null;
+}
+
+function isEditableElement(element) {
+    return !!element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT' || element.isContentEditable);
+}
+
+function getTrainerNow() {
+    return (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+}
+
+function requestAnimationFrameSafe(callback) {
+    if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback);
+    return setTimeout(() => callback(getTrainerNow()), 16);
+}
+
+function cancelAnimationFrameSafe(frameId) {
+    if (frameId == null) return;
+    if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frameId);
+    else clearTimeout(frameId);
+}
+
+function formatTrainerTime(rawTimeMs = 0) {
+    const totalCentiseconds = Math.round(rawTimeMs / 10);
+    const minutes = Math.floor(totalCentiseconds / 6000);
+    const seconds = Math.floor((totalCentiseconds % 6000) / 100);
+    const centiseconds = totalCentiseconds % 100;
+
+    if (minutes > 0) {
+        return `${minutes}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
+    }
+
+    return `${seconds}.${String(centiseconds).padStart(2, '0')}`;
+}
+
+function getTrainerDisplayTime(record) {
+    if (!record) return '0.00';
+    if (record.penalty === 'dnf') return `DNF (${formatTrainerTime(record.rawTimeMs)})`;
+    if (record.penalty === 'plus2') return `${formatTrainerTime(record.rawTimeMs + 2000)}+`;
+    return formatTrainerTime(record.rawTimeMs);
+}
+
+function getTrainerRecordFinalTime(record) {
+    if (!record) return Infinity;
+    if (record.penalty === 'dnf') return Infinity;
+    return record.rawTimeMs + (record.penalty === 'plus2' ? 2000 : 0);
+}
+
+function calculateTrainerAverage(count) {
+    const recentRecords = getTrainerSessionRecords().slice(0, count);
+    if (recentRecords.length < count) return null;
+
+    const trimCount = Math.ceil(count * 0.05);
+    const times = recentRecords.map(getTrainerRecordFinalTime);
+    const dnfCount = times.filter((time) => !Number.isFinite(time)).length;
+
+    if (dnfCount > trimCount) return 'DNF';
+
+    const sortedTimes = [...times].sort((left, right) => left - right);
+    const keptTimes = sortedTimes.slice(trimCount, sortedTimes.length - trimCount);
+
+    if (keptTimes.length === 0 || keptTimes.some((time) => !Number.isFinite(time))) {
+        return 'DNF';
+    }
+
+    const averageMs = keptTimes.reduce((sum, time) => sum + time, 0) / keptTimes.length;
+    return formatTrainerTime(averageMs);
+}
+
+function renderTrainerAverages() {
+    TRAINER_AVERAGE_COUNTS.forEach((count) => {
+        const valueEl = document.getElementById(`trainer-avg-${count}`);
+        if (!valueEl) return;
+
+        const averageValue = calculateTrainerAverage(count);
+        const displayValue = averageValue ?? '--';
+
+        valueEl.innerText = displayValue;
+        valueEl.classList.toggle('is-empty', averageValue == null);
+        valueEl.classList.toggle('is-dnf', averageValue === 'DNF');
+    });
+}
+
+function setTrainerStatus(statusKey = 'trainer_status_idle') {
+    currentTrainerStatusKey = statusKey;
+    updateTrainerTypeBadge();
+}
+
+function setTrainerTimerDisplay(value = '0.00') {
+    const timerEl = document.getElementById('trainer-timer');
+    if (timerEl) timerEl.innerText = value;
+}
+
+function setTrainerActionButtonIcon(buttonEl, icon = '', label = '') {
+    if (!buttonEl) return;
+    buttonEl.classList.add('trainer-icon-btn');
+    buttonEl.innerText = icon;
+    if (label) {
+        buttonEl.setAttribute('aria-label', label);
+        buttonEl.title = label;
+    } else {
+        buttonEl.removeAttribute('aria-label');
+        buttonEl.removeAttribute('title');
+    }
+}
+
+function updateTrainerPenaltyButtonIcons() {
+    setTrainerActionButtonIcon(document.getElementById('trainer-plus2-btn'), TRAINER_ACTION_ICONS.plus2, t('btn_penalty_plus2'));
+    setTrainerActionButtonIcon(document.getElementById('trainer-dnf-btn'), TRAINER_ACTION_ICONS.dnf, t('btn_penalty_dnf'));
+}
+
+function updateTrainerTimerVisualState() {
+    const timerEl = document.getElementById('trainer-timer');
+    if (!timerEl) return;
+
+    timerEl.classList.remove('is-holding', 'is-ready', 'is-running');
+    if (trainerTimerState === 'holding') timerEl.classList.add('is-holding');
+    if (trainerTimerState === 'ready') timerEl.classList.add('is-ready');
+    if (trainerTimerState === 'running') timerEl.classList.add('is-running');
+}
+
+function syncTrainerTimerToLatestRecord() {
+    setTrainerTimerDisplay(getTrainerDisplayTime(getLatestTrainerSessionRecord()));
+    updateTrainerTimerVisualState();
+}
+
+function updateTrainerDeleteButtons() {
+    const deleteBtn = document.getElementById('trainer-delete-btn');
+    const confirmBtn = document.getElementById('trainer-delete-confirm-btn');
+    if (!deleteBtn || !confirmBtn) return;
+
+    const deleteLabelKey = trainerDeleteConfirmArmed ? 'btn_delete_cancel' : 'btn_delete_solve';
+    const deleteIcon = trainerDeleteConfirmArmed ? TRAINER_ACTION_ICONS.cancel : TRAINER_ACTION_ICONS.delete;
+    setTrainerActionButtonIcon(deleteBtn, deleteIcon, t(deleteLabelKey));
+    setTrainerActionButtonIcon(confirmBtn, TRAINER_ACTION_ICONS.confirm, t('btn_delete_confirm'));
+    deleteBtn.classList.toggle('is-armed', trainerDeleteConfirmArmed);
+    confirmBtn.classList.toggle('hidden', !trainerDeleteConfirmArmed);
+}
+
+function setTrainerClearMenuOpen(isOpen) {
+    trainerClearMenuOpen = !!isOpen;
+
+    const menuEl = document.getElementById('trainer-clear-menu');
+    const buttonEl = document.getElementById('trainer-clear-menu-btn');
+    if (menuEl) menuEl.classList.toggle('hidden', !trainerClearMenuOpen);
+    if (buttonEl) {
+        buttonEl.setAttribute('aria-expanded', String(trainerClearMenuOpen));
+        setActionButtonActive(buttonEl, trainerClearMenuOpen);
+    }
+}
+
+function toggleTrainerClearMenu(event) {
+    if (event) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+    }
+    setTrainerClearMenuOpen(!trainerClearMenuOpen);
+}
+
+function requestClearTrainerRecords(type) {
+    const normalizedType = normalizeTrainerAlgorithmType(type);
+    const typeLabel = t(normalizedType === 'edge' ? 'algorithm_edges' : 'algorithm_corners');
+    const targetRecords = trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) === normalizedType);
+
+    setTrainerClearMenuOpen(false);
+    if (targetRecords.length === 0) {
+        alert(t('alert_no_trainer_records_type', { type: typeLabel }));
+        return;
+    }
+
+    const confirmed = confirm(t('confirm_clear_trainer_records', { type: typeLabel, count: targetRecords.length }));
+    if (!confirmed) return;
+
+    trainerDeleteConfirmArmed = false;
+    trainerHistoryDeleteConfirmRecordId = null;
+    expandedTrainerRecordId = null;
+    saveTrainerRecords(
+        trainerRecords.filter((record) => normalizeTrainerAlgorithmType(record.algorithmType) !== normalizedType)
+    );
+    setTrainerStatus(currentTrainerScramble ? 'trainer_status_idle' : 'trainer_status_no_scramble');
+}
+
+function toggleTrainerRecordExpanded(recordId) {
+    if (!recordId) return;
+
+    trainerDeleteConfirmArmed = false;
+    updateTrainerDeleteButtons();
+
+    if (expandedTrainerRecordId === recordId) {
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+    } else {
+        expandedTrainerRecordId = recordId;
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
+
+    renderTrainerRecords();
+}
+
+function resolveTrainerRecordActionTarget(recordId = null) {
+    if (recordId) {
+        const targetRecord = trainerRecords.find((record) => record.id === recordId);
+        return targetRecord?.id || null;
+    }
+
+    return syncLatestTrainerRecordId();
+}
+
+function toggleTrainerHistoryDeleteConfirm(recordId) {
+    if (!recordId) return;
+
+    trainerDeleteConfirmArmed = false;
+    updateTrainerDeleteButtons();
+    trainerHistoryDeleteConfirmRecordId = trainerHistoryDeleteConfirmRecordId === recordId ? null : recordId;
+    renderTrainerRecords();
+}
+
+function confirmDeleteTrainerRecord(recordId) {
+    const targetRecordId = resolveTrainerRecordActionTarget(recordId);
+    if (!targetRecordId) return;
+
+    trainerHistoryDeleteConfirmRecordId = null;
+    if (expandedTrainerRecordId === targetRecordId) expandedTrainerRecordId = null;
+    saveTrainerRecords(trainerRecords.filter((record) => record.id !== targetRecordId));
+    setTrainerStatus(currentTrainerScramble ? 'trainer_status_idle' : 'trainer_status_no_scramble');
+}
+
+function renderTrainerRecords() {
+    const sessionRecords = getTrainerSessionRecords();
+    const latestRecord = sessionRecords[0] || null;
+    latestTrainerRecordId = latestRecord?.id || null;
+    const penaltyShellEl = document.getElementById('trainer-penalty-shell');
+    const historyEl = document.getElementById('trainer-history');
+
+    if (expandedTrainerRecordId && !sessionRecords.some((record) => record.id === expandedTrainerRecordId)) {
+        expandedTrainerRecordId = null;
+        trainerHistoryDeleteConfirmRecordId = null;
+    }
+
+    if (penaltyShellEl) penaltyShellEl.classList.toggle('hidden', !latestRecord);
+
+    updateTrainerPenaltyButtonIcons();
+    setActionButtonActive(document.getElementById('trainer-plus2-btn'), latestRecord?.penalty === 'plus2');
+    setActionButtonActive(document.getElementById('trainer-dnf-btn'), latestRecord?.penalty === 'dnf');
+    updateTrainerDeleteButtons();
+
+    if (historyEl) {
+        historyEl.innerHTML = '';
+
+        if (!latestRecord) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'trainer-history-empty';
+            emptyEl.innerText = t('trainer_history_empty');
+            historyEl.appendChild(emptyEl);
+        } else {
+            const fragment = document.createDocumentFragment();
+            sessionRecords.forEach((record, index) => {
+                const isExpanded = record.id === expandedTrainerRecordId;
+                const itemEl = document.createElement('div');
+                itemEl.className = `trainer-history-item${index === 0 ? ' is-latest' : ''}${isExpanded ? ' is-expanded' : ''}`;
+                itemEl.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    toggleTrainerRecordExpanded(record.id);
+                });
+
+                const headEl = document.createElement('div');
+                headEl.className = 'trainer-history-head';
+
+                const timeEl = document.createElement('div');
+                timeEl.className = 'trainer-history-time';
+                timeEl.innerText = getTrainerDisplayTime(record);
+
+                const metaEl = document.createElement('div');
+                metaEl.className = 'trainer-history-meta';
+                const metaParts = [];
+                if (record.pair) metaParts.push(record.pair.toUpperCase());
+                metaParts.push(t(record.algorithmType === 'edge' ? 'algorithm_edges' : 'algorithm_corners'));
+                const algorithmText = getTrainerRecordAlgorithmText(record);
+                if (algorithmText) metaParts.push(algorithmText);
+                metaEl.innerText = metaParts.join(' / ');
+                if (record.scramble) itemEl.title = record.scramble;
+
+                headEl.appendChild(timeEl);
+                headEl.appendChild(metaEl);
+                itemEl.appendChild(headEl);
+
+                if (isExpanded) {
+                    const algorithmText = getTrainerRecordAlgorithmText(record);
+                    const isDeleteConfirming = trainerHistoryDeleteConfirmRecordId === record.id;
+
+                    const detailsEl = document.createElement('div');
+                    detailsEl.className = 'trainer-history-details';
+
+                    const scrambleLabelEl = document.createElement('div');
+                    scrambleLabelEl.className = 'trainer-history-detail-label';
+                    scrambleLabelEl.innerText = t('trainer_scramble_label');
+
+                    const scrambleValueEl = document.createElement('div');
+                    scrambleValueEl.className = 'trainer-history-detail-value';
+                    scrambleValueEl.innerText = record.scramble || '--';
+
+                    const solutionLabelEl = document.createElement('div');
+                    solutionLabelEl.className = 'trainer-history-detail-label';
+                    solutionLabelEl.innerText = t('trainer_solution_label');
+
+                    const solutionValueEl = document.createElement('div');
+                    solutionValueEl.className = 'trainer-history-detail-value';
+                    solutionValueEl.innerText = algorithmText || '--';
+
+                    const actionRowEl = document.createElement('div');
+                    actionRowEl.className = 'trainer-history-action-row';
+
+                    const plus2Btn = document.createElement('button');
+                    plus2Btn.type = 'button';
+                    plus2Btn.className = 'action-btn trainer-history-action-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(plus2Btn, TRAINER_ACTION_ICONS.plus2, t('btn_penalty_plus2'));
+                    setActionButtonActive(plus2Btn, record.penalty === 'plus2');
+                    plus2Btn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerPenalty('plus2', record.id);
+                    });
+
+                    const dnfBtn = document.createElement('button');
+                    dnfBtn.type = 'button';
+                    dnfBtn.className = 'action-btn trainer-history-action-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(dnfBtn, TRAINER_ACTION_ICONS.dnf, t('btn_penalty_dnf'));
+                    setActionButtonActive(dnfBtn, record.penalty === 'dnf');
+                    dnfBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerPenalty('dnf', record.id);
+                    });
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'action-btn trainer-history-action-btn trainer-delete-btn trainer-icon-btn';
+                    setTrainerActionButtonIcon(
+                        deleteBtn,
+                        isDeleteConfirming ? TRAINER_ACTION_ICONS.cancel : TRAINER_ACTION_ICONS.delete,
+                        t(isDeleteConfirming ? 'btn_delete_cancel' : 'btn_delete_solve')
+                    );
+                    deleteBtn.classList.toggle('is-armed', isDeleteConfirming);
+                    deleteBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        toggleTrainerHistoryDeleteConfirm(record.id);
+                    });
+
+                    const confirmBtn = document.createElement('button');
+                    confirmBtn.type = 'button';
+                    confirmBtn.className = `action-btn trainer-history-action-btn trainer-delete-confirm-btn trainer-icon-btn${isDeleteConfirming ? '' : ' hidden'}`;
+                    setTrainerActionButtonIcon(confirmBtn, TRAINER_ACTION_ICONS.confirm, t('btn_delete_confirm'));
+                    confirmBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        confirmDeleteTrainerRecord(record.id);
+                    });
+
+                    actionRowEl.appendChild(plus2Btn);
+                    actionRowEl.appendChild(dnfBtn);
+                    actionRowEl.appendChild(deleteBtn);
+                    actionRowEl.appendChild(confirmBtn);
+
+                    detailsEl.appendChild(scrambleLabelEl);
+                    detailsEl.appendChild(scrambleValueEl);
+                    detailsEl.appendChild(solutionLabelEl);
+                    detailsEl.appendChild(solutionValueEl);
+                    detailsEl.appendChild(actionRowEl);
+                    itemEl.appendChild(detailsEl);
+                }
+
+                fragment.appendChild(itemEl);
+            });
+            historyEl.appendChild(fragment);
+        }
+    }
+
+    updateTrainerScrambleNavButtons();
+    renderTrainerAverages();
+
+    if (trainerTimerState === 'idle') syncTrainerTimerToLatestRecord();
+}
+
+function stopTrainerHold() {
+    if (trainerHoldTimeoutId) {
+        clearTimeout(trainerHoldTimeoutId);
+        trainerHoldTimeoutId = null;
+    }
+}
+
+function stopTrainerAnimation() {
+    cancelAnimationFrameSafe(trainerAnimationFrameId);
+    trainerAnimationFrameId = null;
+}
+
+function resetTrainerTimerState(options = {}) {
+    stopTrainerHold();
+    stopTrainerAnimation();
+    trainerStartTimestamp = 0;
+    trainerTimerState = 'idle';
+    updateTrainerTimerVisualState();
+    if (options.keepStatus !== true) setTrainerStatus(options.statusKey || 'trainer_status_idle');
+    if (options.resetTimerDisplay === true) syncTrainerTimerToLatestRecord();
+}
+
+function tickTrainerTimer() {
+    if (trainerTimerState !== 'running') return;
+    setTrainerTimerDisplay(formatTrainerTime(getTrainerNow() - trainerStartTimestamp));
+    trainerAnimationFrameId = requestAnimationFrameSafe(tickTrainerTimer);
+}
+
+function startTrainerTimer() {
+    stopTrainerHold();
+    trainerTimerState = 'running';
+    trainerStartTimestamp = getTrainerNow();
+    setTrainerStatus('trainer_status_running');
+    setTrainerTimerDisplay('0.00');
+    updateTrainerTimerVisualState();
+    stopTrainerAnimation();
+    trainerAnimationFrameId = requestAnimationFrameSafe(tickTrainerTimer);
+}
+
+function stopTrainerTimer() {
+    if (trainerTimerState !== 'running') return;
+
+    const rawTimeMs = Math.max(0, Math.round(getTrainerNow() - trainerStartTimestamp));
+    stopTrainerAnimation();
+    trainerTimerState = 'idle';
+    updateTrainerTimerVisualState();
+
+    const recordAlgorithm = formatTrainerCommutatorText(
+        currentTrainerAlgorithm || getPairContentValue(currentTrainerPair || '', currentTrainerAlgorithmType)
+    );
+
+    const nextRecord = {
+        id: `trainer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        rawTimeMs,
+        penalty: 'ok',
+        scramble: currentTrainerScramble,
+        pair: currentTrainerPair || '',
+        algorithm: recordAlgorithm,
+        algorithmType: currentTrainerAlgorithmType,
+        createdAt: Date.now()
+    };
+
+    saveTrainerRecords([nextRecord, ...trainerRecords]);
+    setTrainerStatus('trainer_status_stopped');
+    setTrainerTimerDisplay(getTrainerDisplayTime(nextRecord));
+    generateTrainerScramble({ silent: true, preserveStatus: true });
+}
+
+function toggleTrainerPenalty(penalty, recordId = null) {
+    const targetRecordId = resolveTrainerRecordActionTarget(recordId);
+    if (!targetRecordId) return;
+
+    trainerHistoryDeleteConfirmRecordId = null;
+    const nextRecords = trainerRecords.map((record) => {
+        if (record.id !== targetRecordId) return record;
+        return {
+            ...record,
+            penalty: record.penalty === penalty ? 'ok' : penalty
+        };
+    });
+
+    saveTrainerRecords(nextRecords);
+    setTrainerStatus('trainer_status_stopped');
+}
+
+function toggleTrainerDeleteConfirm() {
+    if (!syncLatestTrainerRecordId()) return;
+    trainerDeleteConfirmArmed = !trainerDeleteConfirmArmed;
+    trainerHistoryDeleteConfirmRecordId = null;
+    updateTrainerDeleteButtons();
+    setTrainerStatus(trainerDeleteConfirmArmed ? 'trainer_status_delete_confirm' : 'trainer_status_stopped');
+}
+
+function confirmDeleteLatestTrainerRecord() {
+    confirmDeleteTrainerRecord(syncLatestTrainerRecordId());
+}
+
+function handleTrainerKeyDown(event) {
+    if (isEditableElement(document.activeElement)) return false;
+
+    if (trainerTimerState === 'running') {
+        if (event.repeat) return true;
+        event.preventDefault();
+        stopTrainerTimer();
+        return true;
+    }
+
+    if (event.code !== 'Space') return false;
+
+    event.preventDefault();
+    if (event.repeat) return true;
+
+    if (trainerTimerState === 'idle') {
+        if (!currentTrainerScramble) {
+            generateTrainerScramble();
+        } else {
+            startTrainerTimer();
+        }
+    }
+
+    return true;
+}
+
+function handleTrainerKeyUp(event) {
+    if (event.code !== 'Space') return false;
+    if (isEditableElement(document.activeElement)) return false;
+    return false;
+}
+
+function shouldSuppressTrainerGhostClick(event) {
+    if (event?.type !== 'click') return false;
+    if (Date.now() > trainerTouchSuppressClickUntil) return false;
+
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    return true;
+}
+
+function canHandleTrainerCardTapTarget(targetEl) {
+    if (!(targetEl instanceof Element)) return false;
+    if (targetEl.closest('.trainer-panel')) return false;
+    if (targetEl.closest('#trainer-penalty-shell')) return false;
+    if (targetEl.closest('button, a, input, textarea, select, label')) return false;
+    return true;
+}
+
+function readTrainerTouchPoint(event, identifier = null) {
+    if (!event) return null;
+
+    const touchLists = [event.touches, event.changedTouches];
+    for (const touchList of touchLists) {
+        if (!touchList || touchList.length === 0) continue;
+        if (identifier == null) return touchList[0];
+        for (const touch of touchList) {
+            if (touch.identifier === identifier) return touch;
+        }
+    }
+    return null;
+}
+
+function getTrainerTouchMoveDistance(touchPoint, touchState) {
+    if (!touchPoint || !touchState) return Infinity;
+    const deltaX = touchPoint.clientX - touchState.startX;
+    const deltaY = touchPoint.clientY - touchState.startY;
+    return Math.hypot(deltaX, deltaY);
+}
+
+function handleTrainerCardTouchStart(event) {
+    const activeTab = document.querySelector('.view-section.active')?.id;
+    if (activeTab !== 'view-trainer') return;
+
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!canHandleTrainerCardTapTarget(targetEl)) {
+        trainerTouchTapState = null;
+        return;
+    }
+
+    const touchPoint = readTrainerTouchPoint(event);
+    if (!touchPoint) {
+        trainerTouchTapState = null;
+        return;
+    }
+
+    if (event.cancelable) event.preventDefault();
+    trainerTouchTapState = {
+        identifier: touchPoint.identifier,
+        startX: touchPoint.clientX,
+        startY: touchPoint.clientY,
+        moved: false
+    };
+}
+
+function handleTrainerCardTouchMove(event) {
+    if (!trainerTouchTapState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, trainerTouchTapState.identifier);
+    if (!touchPoint) return;
+
+    if (getTrainerTouchMoveDistance(touchPoint, trainerTouchTapState) > TRAINER_TOUCH_TAP_MAX_MOVE_PX) {
+        trainerTouchTapState.moved = true;
+    }
+}
+
+function handleTrainerCardTouchEnd(event) {
+    if (!trainerTouchTapState) return;
+
+    const touchPoint = readTrainerTouchPoint(event, trainerTouchTapState.identifier);
+    const movedTooFar = !touchPoint || trainerTouchTapState.moved || getTrainerTouchMoveDistance(touchPoint, trainerTouchTapState) > TRAINER_TOUCH_TAP_MAX_MOVE_PX;
+    trainerTouchTapState = null;
+
+    if (movedTooFar) return;
+
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!canHandleTrainerCardTapTarget(targetEl)) return;
+
+    trainerTouchSuppressClickUntil = Date.now() + TRAINER_TOUCH_GHOST_CLICK_SUPPRESS_MS;
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    handleTrainerTimerTap(event);
+}
+
+function handleTrainerCardTouchCancel() {
+    trainerTouchTapState = null;
+}
+
+function handleTrainerTimerTap(event) {
+    if (shouldSuppressTrainerGhostClick(event)) return true;
+
+    if (event) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const activeTab = document.querySelector('.view-section.active')?.id;
+    if (activeTab !== 'view-trainer') return false;
+
+    if (trainerTimerState === 'running') {
+        stopTrainerTimer();
+        return true;
+    }
+
+    if (trainerTimerState !== 'idle') return false;
+
+    if (!currentTrainerScramble) {
+        generateTrainerScramble();
+        return true;
+    }
+
+    startTrainerTimer();
+    return true;
+}
+
+function handleTrainerCardTap(event) {
+    if (shouldSuppressTrainerGhostClick(event)) return true;
+
+    const targetEl = event?.target instanceof Element ? event.target : null;
+    if (!targetEl) return false;
+
+    if (!canHandleTrainerCardTapTarget(targetEl)) return false;
+
+    return handleTrainerTimerTap(event);
+}
+
+function resetTrainerView(options = {}) {
+    stopTrainerHold();
+    stopTrainerAnimation();
+    trainerTimerState = 'idle';
+    currentTrainerPair = null;
+    currentTrainerScramble = '';
+    currentTrainerAlgorithm = '';
+
+    setTrainerScrambleDisplay('');
+    updateTrainerTypeBadge();
+
+    if (options.showNoScramble) {
+        setTrainerStatus('trainer_status_no_scramble');
+    } else {
+        setTrainerStatus('trainer_status_idle');
+    }
+    if (options.resetTimerDisplay !== false) syncTrainerTimerToLatestRecord();
+    updateTrainerScrambleNavButtons();
+}
+
+function generateTrainerScramble(options = {}) {
+    if (trainerTimerState === 'running') return;
+    clearTrainerInlineStates();
+
+    resetTrainerTimerState({
+        keepStatus: true,
+        resetTimerDisplay: options.resetTimerDisplay !== false
+    });
+
+    const result = getTrainerCandidatePairs();
+    if (result.error) {
+        resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
+        if (!options.silent) alert(t(result.error));
+        return;
+    }
+
+    const pairAlgorithmEntriesMap = {};
+    const validPairs = [];
+    result.pairs.forEach((pair) => {
+        try {
+            const algorithmEntries = getTrainerPairAlgorithmEntries(pair);
+            if (algorithmEntries.length === 0) return;
+            pairAlgorithmEntriesMap[pair] = algorithmEntries;
+            validPairs.push(pair);
+        } catch (error) {
+            // Ignore invalid algorithms so one bad entry does not block all scramble generation.
+        }
+    });
+
+    if (validPairs.length === 0) {
+        resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
+        if (!options.silent) alert(t('alert_invalid_algorithm_format'));
+        return;
+    }
+
+    const pair = chooseTrainerPairFromPool(validPairs, currentTrainerAlgorithmType);
+    const pickedAlgorithm = getTrainerPairMovesWithCycle(pair, pairAlgorithmEntriesMap[pair]);
+    const scrambleMoves = buildCubeSolverTrainerScrambleMoves(pickedAlgorithm?.moves || []);
+
+    if (!scrambleMoves || scrambleMoves.length === 0) {
+        resetTrainerView({ showNoScramble: true, resetTimerDisplay: options.resetTimerDisplay !== false });
+        if (!options.silent) alert(t('alert_invalid_algorithm_format'));
+        return;
+    }
+
+    currentTrainerAlgorithm = formatTrainerCommutatorText(pickedAlgorithm?.algorithm || '');
+    const nextScramble = scrambleMoves.join(' ');
+    rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType, {
+        algorithm: currentTrainerAlgorithm
+    });
+    const navState = getTrainerScrambleNavState();
+    applyTrainerScrambleSnapshot(navState.items[navState.index], {
+        preserveStatus: options.preserveStatus === true
+    });
+}
+
+function toggleViewMode(mode) {
+    currentListViewMode = mode;
+    isMatrixMode = isMatrixListView(mode);
+    const listBtn = document.getElementById('btn-mode-list');
+    const matrixBtn = document.getElementById('btn-mode-matrix');
+    const wordBtn = document.getElementById('btn-mode-content-word');
+    const formulaBtn = document.getElementById('btn-mode-content-formula');
+    const algorithmTypeSwitcher = document.getElementById('algorithm-type-switcher');
+    const listControls = document.getElementById('list-mode-controls');
+    const formulaHint = document.getElementById('formula-mode-hint');
+    const matrixSettings = document.getElementById('matrix-settings');
+    const gridArea = document.getElementById('grid-area');
+    const formulaArea = document.getElementById('formula-area');
+    const matrixArea = document.getElementById('matrix-area');
+    const matrixFooter = document.getElementById('matrix-footer');
+    const container = document.getElementById('main-container');
+    const currentLayout = getCurrentListLayoutMode(mode);
+    const currentContentGroup = getCurrentListContentGroup(mode);
+    const currentContent = getCurrentListContentMode(mode);
+
+    setActionButtonActive(listBtn, currentLayout === 'list');
+    setActionButtonActive(matrixBtn, currentLayout === 'matrix');
+    setActionButtonActive(wordBtn, currentContentGroup === 'word');
+    setActionButtonActive(formulaBtn, currentContentGroup === 'formula');
+    updateAlgorithmTypeButtons();
+
+    if (algorithmTypeSwitcher) {
+        algorithmTypeSwitcher.classList.toggle('hidden', currentContentGroup !== 'formula');
+    }
+
+    if (isMatrixListView(mode)) {
+        container.classList.add('wide-mode');
+        listControls.classList.add('hidden');
+        formulaHint.classList.add('hidden');
+        matrixSettings.classList.remove('hidden');
+        gridArea.classList.add('hidden');
+        formulaArea.classList.add('hidden');
+        matrixArea.classList.remove('hidden');
+        if (matrixFooter) matrixFooter.classList.remove('hidden');
+        renderMatrix(currentContent);
+    } else if (currentContentGroup === 'formula') {
+        container.classList.remove('wide-mode');
+        listControls.classList.remove('hidden');
+        formulaHint.classList.remove('hidden');
+        matrixSettings.classList.add('hidden');
+        gridArea.classList.add('hidden');
+        formulaArea.classList.remove('hidden');
+        matrixArea.classList.add('hidden');
+        if (matrixFooter) matrixFooter.classList.add('hidden');
+        renderFormulaList();
+    } else {
+        container.classList.remove('wide-mode');
+        listControls.classList.remove('hidden');
+        formulaHint.classList.add('hidden');
+        matrixSettings.classList.add('hidden');
+        gridArea.classList.remove('hidden');
+        formulaArea.classList.add('hidden');
+        matrixArea.classList.add('hidden');
+        if (matrixFooter) matrixFooter.classList.add('hidden');
+        renderList();
+    }
+}
+
+function renderList() {
+    const startChar = document.getElementById('char-select').value;
+    const container = document.getElementById('grid-area');
+    const dict = getDict();
+    container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    chars.forEach((endChar) => {
+        if (startChar === endChar) return;
+        const pair = startChar + endChar;
+        const div = document.createElement('div'); div.className = 'pair-item';
+        div.innerHTML = `<div class="pair-label">${pair.toUpperCase()}</div>`;
+
+        const input = document.createElement('input');
+        input.className = 'pair-input';
+        input.dataset.pair = pair;
+
+        const stColor = getPairColor(pair);
+        if (stColor) input.classList.add(`status-${stColor}`);
+        input.value = dict[pair] || "";
+
+        div.appendChild(input);
+        fragment.appendChild(div);
+    });
+    container.appendChild(fragment);
+}
+
+function renderFormulaList() {
+    const startChar = document.getElementById('char-select').value;
+    const container = document.getElementById('formula-area');
+    const contentMode = getCurrentListContentMode();
+    const formulaDict = getContentDict(contentMode);
+    container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    chars.forEach((endChar) => {
+        if (startChar === endChar) return;
+        const pair = startChar + endChar;
+        const div = document.createElement('div');
+        div.className = 'pair-item pair-item-formula';
+        div.innerHTML = `<div class="pair-label">${pair.toUpperCase()}</div>`;
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'pair-input formula-input';
+        textarea.dataset.pair = pair;
+        textarea.dataset.store = contentMode;
+        textarea.rows = 3;
+        textarea.placeholder = getAlgorithmPlaceholder(pair, contentMode);
+
+        const stColor = getPairColor(pair, contentMode);
+        if (stColor) textarea.classList.add(`status-${stColor}`);
+        textarea.value = formulaDict[pair] || "";
+
+        div.appendChild(textarea);
+        fragment.appendChild(div);
+    });
+
+    container.appendChild(fragment);
+}
+
+function renderMatrix(contentMode = 'word') {
+    const table = document.getElementById('full-matrix');
+    const matrixWrapper = document.getElementById('matrix-area');
+    const dict = getContentDict(contentMode);
+    if (matrixWrapper) matrixWrapper.classList.toggle('formula-matrix-mode', isAlgorithmContentMode(contentMode));
+
+    // [修改] 渲染時清空選取
+    selectedMatrixPairs.clear();
+    updateMatrixToolbar();
+
+    const rows = [];
+    const escapeHtmlAttribute = (value = '') => value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const escapeHtmlText = (value = '') => value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    let headerHtml = '<thead><tr><th></th>';
+    chars.forEach((c, index) => {
+        headerHtml += `<th><input value="${c.toUpperCase()}" onchange="updateGlobalChar(${index}, this.value)" class="header-input char-idx-${index}"></th>`;
+    });
+    headerHtml += '</tr></thead><tbody>';
+    rows.push(headerHtml);
+
+    chars.forEach((rowChar, rowIndex) => {
+        let rowHtml = `<tr><th><input value="${rowChar.toUpperCase()}" onchange="updateGlobalChar(${rowIndex}, this.value)" class="header-input char-idx-${rowIndex}"></th>`;
+        chars.forEach((colChar, colIndex) => {
+            const pair = rowChar + colChar;
+            const stColor = getPairColor(pair, contentMode);
+            let cellClass = stColor ? `status-${stColor}` : '';
+            const val = dict[pair] || '';
+            const placeholder = isAlgorithmContentMode(contentMode) ? getAlgorithmPlaceholder(pair, contentMode) : '';
+            const inputMarkup = isAlgorithmContentMode(contentMode)
+                ? `<textarea class="matrix-input" data-pair="${escapeHtmlAttribute(pair)}" data-store="${escapeHtmlAttribute(contentMode)}" placeholder="${escapeHtmlAttribute(placeholder)}" rows="3">${escapeHtmlText(val)}</textarea>`
+                : `<input class="matrix-input" value="${escapeHtmlAttribute(val)}" data-pair="${escapeHtmlAttribute(pair)}" data-store="${escapeHtmlAttribute(contentMode)}">`;
+
+            if (rowChar === colChar) {
+                rowHtml += `<td class="cell-diagonal ${cellClass}">
+                    <div class="diagonal-wrapper">
+                        ${inputMarkup}
+                        <button class="btn-diagonal-check" data-pair="${pair}" data-char="${rowChar}" data-store="${contentMode}">${t('btn_same')}</button>
+                    </div>
+                </td>`;
+            } else {
+                rowHtml += `<td class="${cellClass}">
+                    ${inputMarkup}
+                </td>`;
+            }
+        });
+        rowHtml += '</tr>';
+        rows.push(rowHtml);
+    });
+    rows.push('</tbody>');
+    table.innerHTML = rows.join('');
+}
+
+// --- [核心修改] 矩陣聚焦邏輯 (僅保留十字線) ---
+function handleMatrixFocus(el) {
+    // 十字線高亮
+    const td = el.closest('td'); if (!td) return;
+    const tr = td.parentElement; const table = document.getElementById('full-matrix');
+    if (!tr || !table) return;
+    const colIndex = td.cellIndex;
+    for (let c = 0; c < tr.cells.length; c++) { if (tr.cells[c]) tr.cells[c].classList.add('highlight-guide'); }
+    for (let r = 0; r < table.rows.length; r++) { if (table.rows[r] && table.rows[r].cells[colIndex]) { table.rows[r].cells[colIndex].classList.add('highlight-guide'); } }
+}
+
+// --- [新增] 切換選取狀態 ---
+function toggleMatrixSelection(pair, cellElement) {
+    if (selectedMatrixPairs.has(pair)) {
+        selectedMatrixPairs.delete(pair);
+        cellElement.classList.remove('is-selected');
+    } else {
+        selectedMatrixPairs.add(pair);
+        cellElement.classList.add('is-selected');
+    }
+    updateMatrixToolbar();
+}
+
+function updateMatrixToolbar() {
+    const label = document.getElementById('active-pair-label');
+    if (label) {
+        if (selectedMatrixPairs.size > 0) {
+            label.innerText = t('sel_count', { n: selectedMatrixPairs.size });
+        } else {
+            label.innerText = "";
+        }
+    }
+}
+
+function handleMatrixBlur() {
+    document.querySelectorAll('.highlight-guide').forEach(el => el.classList.remove('highlight-guide'));
+    // 不隱藏工具列，方便連續操作
+}
+
+// --- [新增] 手動設定狀態功能 (含隱藏) ---
+window.setMatrixStatus = function (statusType) {
+    if (selectedMatrixPairs.size === 0) {
+        alert(t('alert_select_matrix_cells'));
+        return;
+    }
+
+    const contentMode = getCurrentListContentMode();
+    const pairsToUpdate = Array.from(selectedMatrixPairs);
+
+    pairsToUpdate.forEach(pair => {
+        let newData;
+        if (statusType === 'gray') {
+            // 隱藏狀態
+            newData = { interval: -1, repetition: 0, ef: 2.5, dueDate: 0, color: 'gray' };
+        } else {
+            // 手動評分
+            const grade = statusType === 'green' ? 5 : (statusType === 'yellow' ? 3 : 1);
+            const currentData = getPairData(pair, contentMode);
+            newData = calculateNextReview(currentData, grade);
+        }
+
+        saveStatusData(pair, newData, contentMode);
+        if (statusType === 'gray' && contentMode === 'word') {
+            saveStatusData(pair, newData, 'corner');
+        }
+
+        // 更新畫面颜色
+        const inputEl = document.querySelector(`.matrix-input[data-pair="${pair}"]`);
+        if (inputEl) {
+            const td = inputEl.closest('td');
+            if (td) {
+                td.className = ''; // 清除舊顏色
+                if (newData.color) td.classList.add(`status-${newData.color}`);
+                if (pair[0] === pair[1]) td.classList.add('cell-diagonal');
+                // Clear selection style
+                td.classList.remove('is-selected');
+            }
+        }
+    });
+
+    // 動作完成後，清空選取
+    selectedMatrixPairs.clear();
+    updateMatrixToolbar();
+
+    // 顯示成功訊息
+    const label = document.getElementById('active-pair-label');
+    if (label) {
+        // label text is already updated by updateMatrixToolbar (to empty/sel:0)
+        label.innerText = t('msg_matrix_updated');
+        setTimeout(() => label.innerText = "", 800);
+    }
+};
+
+window.updateGlobalChar = function (index, newValue) {
+    const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
+    chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+    localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(chars));
+    document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
+    updateCharSchemeButtons();
+    initUI(); updateLayoutMode(); renderCurrentListView();
+}
+
+window.toggleMatrixEdit = function (editable) {
+    document.querySelectorAll('.matrix-input').forEach(inp => inp.readOnly = !editable);
+    document.querySelectorAll('.header-input').forEach(inp => inp.readOnly = !editable);
+};;
+
+function isSameCharScheme(candidate = [], reference = []) {
+    if (!Array.isArray(candidate) || !Array.isArray(reference)) return false;
+    if (candidate.length !== reference.length) return false;
+    return candidate.every((value, index) => String(value).toLowerCase() === String(reference[index]).toLowerCase());
+}
+
+function getCurrentCharScheme() {
+    if (isSameCharScheme(chars, CHARS_EN)) return 'en';
+    if (isSameCharScheme(chars, CHARS_ZH)) return 'zh';
+    return 'custom';
+}
+
+function getSavedCustomChars() {
+    const saved = readStoredJson(CUSTOM_CHARS_KEY, null);
+    const normalized = sanitizeChars(saved);
+    return normalized ? normalized : null;
+}
+
+function saveCustomChars(nextChars = chars) {
+    const normalized = sanitizeChars(nextChars);
+    if (!normalized) return;
+    localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(normalized));
+}
+
+function updateCharSchemeButtons() {
+    const currentScheme = getCurrentCharScheme();
+    setActionButtonActive(document.getElementById('chars-zh-btn'), currentScheme === 'zh');
+    setActionButtonActive(document.getElementById('chars-en-btn'), currentScheme === 'en');
+    setActionButtonActive(document.getElementById('chars-custom-btn'), currentScheme === 'custom');
+}
+
+function setCharScheme(scheme = 'zh') {
+    const nextScheme = scheme === 'en' ? 'en' : (scheme === 'custom' ? 'custom' : 'zh');
+    const currentScheme = getCurrentCharScheme();
+
+    if (currentScheme === 'custom') {
+        saveCustomChars(chars);
+    }
+
+    if (nextScheme === 'en') {
+        chars = [...CHARS_EN];
+    } else if (nextScheme === 'zh') {
+        chars = [...CHARS_ZH];
+    } else {
+        const savedCustom = getSavedCustomChars();
+        if (savedCustom) chars = [...savedCustom];
+        else saveCustomChars(chars);
+    }
+
+    localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+
+    initUI();
+    applyLanguage();
+    updateLayoutMode();
+    renderCurrentListView();
+    generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+}
+
+function resetDefaultChars() {
+    if (confirm(t('alert_reset'))) {
+        const currentScheme = getCurrentCharScheme();
+        if (currentScheme === 'en') chars = [...CHARS_EN];
+        else if (currentScheme === 'zh') chars = [...CHARS_ZH];
+        else chars = (currentLang === 'en') ? [...CHARS_EN] : [...CHARS_ZH];
+
+        localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+        initUI();
+        applyLanguage();
+        updateLayoutMode();
+        renderCurrentListView();
+        alert(t('alert_reset_done'));
+    }
+}
+function toggleLanguage() {
+    currentLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
+    localStorage.setItem(LANG_KEY, currentLang);
+    applyLanguage();
+    updateLayoutMode();
+    renderCurrentListView();
+}
+function applyLanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); if (translations[currentLang][key]) el.placeholder = translations[currentLang][key]; });
+    document.documentElement.lang = currentLang === 'zh-TW' ? 'zh-TW' : 'en';
+    document.title = t('page_title');
+    const listSel = document.getElementById('char-select');
+    if (listSel) {
+        const currentVal = listSel.value;
+        listSel.innerHTML = '';
+        chars.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.innerText = `${c.toUpperCase()}${t('opt_start')}`; listSel.appendChild(opt); });
+        if (currentVal && chars.includes(currentVal)) listSel.value = currentVal;
+    }
+    setMemoryCardFlipped(isMemAnswerShown);
+    updateDropdownLabel('mem_start'); updateDropdownLabel('mem_end');
+    updateDropdownLabel('trainer_start'); updateDropdownLabel('trainer_end');
+    updateMemoryContentModeButtons();
+    updateTrainerAlgorithmButtons();
+    updateCharSchemeButtons();
+    updateTrainerTypeBadge();
+    setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
+    setTrainerStatus(currentTrainerStatusKey);
+    renderTrainerRecords();
+    toggleViewMode(currentListViewMode);
+}
+
+function setMemoryCardFlipped(isFlipped) {
+    const memoryCard = document.getElementById('memory-card');
+    const hintEl = document.getElementById('mem-hint');
+    if (memoryCard) memoryCard.classList.toggle('is-flipped', isFlipped);
+    if (hintEl) hintEl.classList.toggle('is-hidden', isFlipped);
+}
+
+function updateMemoryAnswerSize(answerEl, answerText = '') {
+    if (!answerEl) return;
+
+    const normalizedText = String(answerText ?? '').trim();
+    const compactText = normalizedText.replace(/\s+/g, ' ');
+    const lineLengths = normalizedText.split('\n').map((line) => line.trim().length);
+    const longestLine = lineLengths.length > 0 ? Math.max(...lineLengths) : 0;
+    const totalLength = compactText.length;
+
+    answerEl.classList.remove('answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
+
+    if (longestLine <= 8 && totalLength <= 18) {
+        answerEl.classList.add('answer-size-short');
+    } else if (longestLine <= 22 && totalLength <= 52) {
+        answerEl.classList.add('answer-size-medium');
+    } else if (longestLine <= 38 && totalLength <= 90) {
+        answerEl.classList.add('answer-size-long');
+    } else {
+        answerEl.classList.add('answer-size-dense');
+    }
+}
+
+function setDropdownOpenState(content, isOpen) {
+    if (!content) return;
+    content.classList.toggle('show', isOpen);
+    const wrapper = content.closest('.dropdown-wrapper');
+    if (wrapper) wrapper.classList.toggle('is-open', isOpen);
+    const toggleButton = wrapper?.querySelector('.dropdown-toggle-btn');
+    if (toggleButton) toggleButton.setAttribute('aria-expanded', String(isOpen));
+}
+
+function toggleDropdown(id) {
+    const content = document.getElementById(`${id}-content`);
+    if (!content) return;
+    const isShown = content.classList.contains('show');
+    closeAllDropdowns();
+    if (!isShown) setDropdownOpenState(content, true);
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.dropdown-content').forEach(el => setDropdownOpenState(el, false));
+}
+
+// Modified to handle generic ID
+function updateDropdownLabel(key) {
+    // key ex: mem_start
+    const selected = getSelectedRanges(key);
+    const btn = document.getElementById(`${key}-btn`);
+    if (!btn) return;
+
+    const displaySelected = selected.map(s => s.toUpperCase());
+
+    if (selected.length === chars.length) btn.innerText = t('sel_full');
+    else if (selected.length === 0) btn.innerText = t('sel_none');
+    else btn.innerText = selected.length <= 5 ? `${t('sel_prefix')}${displaySelected.join(', ')}` : t('sel_count', { n: selected.length });
+}
+
+function renderCheckboxes(containerId, inputName) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    chars.forEach((c) => {
+        const label = document.createElement('label');
+        label.className = 'checkbox-chip';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = c;
+        input.name = inputName + '_range'; // ex: mem_start_range
+        input.checked = true;
+        input.onchange = () => {
+            updateDropdownLabel(inputName);
+            handleRangeSelectionChange(inputName);
+        };
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(c.toUpperCase()));
+        container.appendChild(label);
+    });
+}
+function toggleAll(inputName, state) {
+    document.querySelectorAll(`input[name="${inputName}_range"]`).forEach(input => input.checked = state);
+    updateDropdownLabel(inputName);
+    handleRangeSelectionChange(inputName);
+}
+function getSelectedRanges(inputName) {
+    return Array.from(document.querySelectorAll(`input[name="${inputName}_range"]:checked`)).map(i => i.value);
+}
+
+function handleRangeSelectionChange(inputName) {
+    if (!inputName.startsWith('trainer_')) return;
+    generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+}
+
+function triggerAction(tabId) {
+    if (tabId === 'view-memory') {
+        if (isMemAnswerShown) nextMemoryCard(); else toggleMemoryAnswer();
+    } else if (tabId === 'view-trainer') {
+        generateTrainerScramble();
+    }
+}
+
+function switchTab(tab) {
+    if (tab === currentTab) return;
+
+    closeAllDropdowns();
+    setTrainerClearMenuOpen(false);
+    const currentIndex = TAB_ORDER.indexOf(currentTab);
+    const nextIndex = TAB_ORDER.indexOf(tab);
+    const enterClass = nextIndex >= currentIndex ? 'tab-enter-forward' : 'tab-enter-backward';
+
+    document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active', 'tab-enter-forward', 'tab-enter-backward'));
+    document.querySelectorAll('.nav-btn').forEach(e => e.classList.remove('active'));
+    const nextSection = document.getElementById(`view-${tab}`);
+    nextSection.classList.add('active');
+    void nextSection.offsetWidth;
+    nextSection.classList.add(enterClass);
+    const btnIndex = { 'list': 0, 'memory': 1, 'trainer': 2, 'data': 3 };
+    document.querySelectorAll('.nav-btn')[btnIndex[tab]].classList.add('active');
+    const container = document.getElementById('main-container');
+    if (tab === 'list' && isMatrixListView()) container.classList.add('wide-mode'); else container.classList.remove('wide-mode');
+    currentTab = tab;
+    if (tab === 'list') renderCurrentListView();
+    if (tab === 'memory') nextMemoryCard();
+    if (tab === 'trainer') {
+        generateTrainerScramble({ silent: true });
+        applyLanguage();
+    }
+}
+
+function resetAllColors(targetColor = 'all') {
+    if (confirm(t('alert_reset'))) {
+        const contentMode = getCurrentListContentMode();
+        const statusKey = getStatusStorageKey(contentMode);
+
+        if (targetColor === 'all') {
+            localStorage.setItem(statusKey, JSON.stringify({}));
+        } else {
+            const currentMap = getStatusMap(contentMode);
+            const nextMap = {};
+
+            Object.entries(currentMap).forEach(([pair, data]) => {
+                const color = typeof data === 'string' ? data : data?.color;
+                if (color !== targetColor) nextMap[pair] = data;
+            });
+
+            localStorage.setItem(statusKey, JSON.stringify(nextMap));
+        }
+
+        renderCurrentListView();
+        alert(t('alert_reset_done'));
+    }
+}
+
+function markMemStatus(gradeType) {
+    if (!currentPair) return;
+    let grade = gradeType === 'red' ? 1 : (gradeType === 'yellow' ? 3 : 5);
+    const selectedModes = getMemoryStatusTargetModes(getAvailablePairContentModes(
+        currentPair,
+        getSelectedMemoryContentModes(),
+        { includePlaceholder: true }
+    ));
+    if (selectedModes.length === 0) return;
+    selectedModes.forEach((mode) => {
+        const currentData = getPairData(currentPair, mode);
+        const newData = calculateNextReview(currentData, grade);
+        saveStatusData(currentPair, newData, mode);
+    });
+    nextMemoryCard();
+}
+
+function getPairDueDate(pair, contentModes = ['word']) {
+    const normalizedModes = normalizeContentModes(contentModes);
+    const dueDates = normalizedModes.map((mode) => {
+        const status = getPairData(pair, mode);
+        if (!status) return 0;
+
+        const dueDate = Number(status.dueDate);
+        return Number.isFinite(dueDate) ? dueDate : 0;
+    });
+
+    return dueDates.length > 0 ? Math.min(...dueDates) : 0;
+}
+
+function getStudyCandidatePool(mode, contentModes = ['word']) {
+    const startChars = getSelectedRanges(`${mode}_start`);
+    const endChars = getSelectedRanges(`${mode}_end`);
+    const normalizedModes = normalizeContentModes(contentModes);
+    const contentValueOptions = mode === 'mem' ? { includePlaceholder: true } : {};
+    const requireAllModes = mode === 'mem' && normalizedModes.length > 1;
+    const now = Date.now();
+
+    if (startChars.length === 0 || endChars.length === 0) return { error: 'alert_sel_range' };
+
+    const candidates = [];
+
+    chars.forEach(start => {
+        if (!startChars.includes(start)) return;
+        chars.forEach(end => {
+            if (!endChars.includes(end)) return;
+
+            const pair = start + end;
+            const availableModes = getAvailablePairContentModes(pair, normalizedModes, contentValueOptions);
+            if (availableModes.length === 0) return;
+            if (requireAllModes && availableModes.length !== normalizedModes.length) return;
+
+            candidates.push({
+                pair,
+                dueDate: getPairDueDate(pair, availableModes)
+            });
+        });
+    });
+
+    if (candidates.length === 0) {
+        return { error: getNoDataErrorKey(normalizedModes) };
+    }
+
+    const dueCandidates = candidates.filter((candidate) => candidate.dueDate <= now);
+    const activeCandidates = dueCandidates.length > 0 ? dueCandidates : candidates;
+    const earliestDueDate = Math.min(...activeCandidates.map((candidate) => candidate.dueDate));
+    const pool = activeCandidates
+        .filter((candidate) => candidate.dueDate === earliestDueDate)
+        .map((candidate) => candidate.pair);
+
+    return {
+        pool,
+        dueDate: earliestDueDate,
+        hasDueCandidates: dueCandidates.length > 0,
+        candidates
+    };
+}
+
+
+function nextMemoryCard() {
+    const result = getStudyCandidatePool('mem', getSelectedMemoryContentModes());
+    if (result.error) {
+        currentPair = null;
+        document.getElementById('mem-q').innerText = '--';
+        document.getElementById('mem-a').innerText = '';
+        document.getElementById('mem-a').classList.remove('show', 'answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
+        document.getElementById('mem-grading-area').classList.add('hidden');
+        setMemoryCardFlipped(false);
+        isMemAnswerShown = false;
+        alert(t(result.error));
+        return;
+    }
+
+    let pool = result.pool;
+    if (!result.hasDueCandidates && Array.isArray(result.candidates) && recentMemPairs.length > 0) {
+        const recentSet = new Set(recentMemPairs.slice(-MEMORY_REPEAT_GAP));
+        const eligibleCandidates = result.candidates.filter((candidate) => !recentSet.has(candidate.pair));
+
+        if (eligibleCandidates.length > 0) {
+            const earliestEligibleDueDate = Math.min(...eligibleCandidates.map((candidate) => candidate.dueDate));
+            pool = eligibleCandidates
+                .filter((candidate) => candidate.dueDate === earliestEligibleDueDate)
+                .map((candidate) => candidate.pair);
+        }
+    }
+
+    if (pool.length > 1 && lastMemPair) pool = pool.filter(p => p !== lastMemPair);
+
+    currentPair = pool[Math.floor(Math.random() * pool.length)];
+    lastMemPair = currentPair;
+    recentMemPairs.push(currentPair);
+    if (recentMemPairs.length > MEMORY_REPEAT_GAP) recentMemPairs = recentMemPairs.slice(-MEMORY_REPEAT_GAP);
+
+    document.getElementById('mem-q').innerText = currentPair.toUpperCase();
+    document.getElementById('mem-a').classList.remove('show', 'answer-size-short', 'answer-size-medium', 'answer-size-long', 'answer-size-dense');
+    document.getElementById('mem-grading-area').classList.add('hidden');
+    setMemoryCardFlipped(false);
+
+    isMemAnswerShown = false; applyLanguage();
+}
+
+function toggleMemoryAnswer() {
+    if (!currentPair || isMemAnswerShown) return;
+    const answerEl = document.getElementById('mem-a');
+    const answerText = formatMemoryAnswer(currentPair, getSelectedMemoryContentModes());
+    answerEl.innerText = answerText;
+    updateMemoryAnswerSize(answerEl, answerText);
+
+    answerEl.classList.add('show');
+    document.getElementById('mem-grading-area').classList.remove('hidden');
+    setMemoryCardFlipped(true);
+    isMemAnswerShown = true; applyLanguage();
+}
+
+function exportData() {
+    const exportType = document.getElementById('export-type').value;
+    const dict = getDict();
+    const cornerFormulaDict = getFormulaDict('corner');
+    const edgeFormulaDict = getFormulaDict('edge');
+
+    if (exportType === 'csv') {
+        let csvContent = "\ufeff";
+        csvContent += "," + chars.map(escapeCsvCell).join(",") + "\n";
+        chars.forEach(rowChar => {
+            let row = [escapeCsvCell(rowChar)];
+            chars.forEach(colChar => {
+                const pair = rowChar + colChar;
+                if (rowChar === colChar) {
+                    row.push("");
+                } else {
+                    row.push(escapeCsvCell(dict[pair] || ""));
+                }
+            });
+            csvContent += row.join(",") + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `letter_pairs_table_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+    } else {
+        const statusMap = getStatusMap();
+        const cornerFormulaStatusMap = getStatusMap('corner');
+        const edgeFormulaStatusMap = getStatusMap('edge');
+        const cleanDict = {};
+        const cleanCornerFormulaDict = {};
+        const cleanEdgeFormulaDict = {};
+        const cleanStatus = {};
+        const cleanCornerFormulaStatus = {};
+        const cleanEdgeFormulaStatus = {};
+
+        chars.forEach(start => {
+            chars.forEach(end => {
+                const pair = start + end;
+                if (dict[pair]) {
+                    cleanDict[pair] = dict[pair];
+                    if (statusMap[pair]) cleanStatus[pair] = statusMap[pair];
+                }
+                if (cornerFormulaDict[pair]) {
+                    cleanCornerFormulaDict[pair] = cornerFormulaDict[pair];
+                    if (cornerFormulaStatusMap[pair]) cleanCornerFormulaStatus[pair] = cornerFormulaStatusMap[pair];
+                }
+                if (edgeFormulaDict[pair]) {
+                    cleanEdgeFormulaDict[pair] = edgeFormulaDict[pair];
+                    if (edgeFormulaStatusMap[pair]) cleanEdgeFormulaStatus[pair] = edgeFormulaStatusMap[pair];
+                }
+            });
+        });
+
+        const backupPayload = {
+            version: 2,
+            exportedAt: new Date().toISOString(),
+            sections: {
+                letterPairs: {
+                    word: cleanDict,
+                    corner: cleanCornerFormulaDict,
+                    edge: cleanEdgeFormulaDict
+                },
+                status: {
+                    word: cleanStatus,
+                    corner: cleanCornerFormulaStatus,
+                    edge: cleanEdgeFormulaStatus
+                },
+                trainer: {
+                    records: trainerRecords
+                },
+                settings: {
+                    chars: chars,
+                    lang: currentLang
+                }
+            }
+        };
+
+        const blob = new Blob([JSON.stringify(backupPayload)], { type: "application/json" });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+function importData() {
+    const fileInput = document.getElementById('file-input');
+    const f = fileInput.files[0];
+    if (!f) return; const r = new FileReader(); r.onload = (e) => {
+        try {
+            const parsedData = JSON.parse(e.target.result);
+            const normalizedData = normalizeBackupPayload(parsedData);
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData.dict));
+            localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.cornerFormulaDict));
+            localStorage.setItem(EDGE_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.edgeFormulaDict));
+            localStorage.setItem(STATUS_KEY, JSON.stringify(normalizedData.status));
+            localStorage.setItem(CORNER_FORMULA_STATUS_KEY, JSON.stringify(normalizedData.cornerFormulaStatus));
+            localStorage.setItem(EDGE_FORMULA_STATUS_KEY, JSON.stringify(normalizedData.edgeFormulaStatus));
+            localStorage.setItem(TRAINER_RECORDS_KEY, JSON.stringify(normalizedData.trainerRecords));
+            trainerRecords = normalizedData.trainerRecords;
+            syncLatestTrainerRecordId();
+            trainerDeleteConfirmArmed = false;
+            expandedTrainerRecordId = null;
+            trainerHistoryDeleteConfirmRecordId = null;
+            resetTrainerScrambleNavigation();
+
+            if (normalizedData.chars) {
+                chars = normalizedData.chars;
+                localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
+                if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
+            }
+
+            if (normalizedData.lang) {
+                currentLang = normalizedData.lang;
+                localStorage.setItem(LANG_KEY, currentLang);
+            }
+
+            fileInput.value = '';
+            alert(t('alert_import_success'));
+            initUI();
+            applyLanguage();
+            updateLayoutMode();
+            renderCurrentListView();
+            renderTrainerRecords();
+            generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+        } catch (err) {
+            fileInput.value = '';
+            alert(t('alert_import_error'));
+        }
+    };
+    r.readAsText(f);
+}
+function clearAllData() {
+    if (confirm(t('alert_reset'))) {
+        clearAppStorageData();
+        location.reload();
+    }
+}
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootApp, { once: true });
+    } else {
+        bootApp();
+    }
+}

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description"
+        content="3BLD(3 style & letter pairs) practice with words, corners, edges, flashcards, typing tests, and local backup.">
+    <title data-i18n="page_title"></title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="style.css?v=20260525b">
+</head>
+
+<body class="app-booting" onload="bootApp()">
+    <div id="boot-overlay" class="boot-overlay" aria-hidden="true">
+        <div class="boot-loader">
+            <div class="boot-loader-pill"></div>
+            <div class="boot-loader-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-container">
+            <button class="nav-btn active" onclick="switchTab('list')" data-i18n="nav_list"></button>
+            <button class="nav-btn" onclick="switchTab('memory')" data-i18n="nav_mem"></button>
+            <button class="nav-btn" onclick="switchTab('trainer')" data-i18n="nav_trainer"></button>
+            <button class="nav-btn" onclick="switchTab('data')" data-i18n="nav_data"></button>
+        </div>
+    </div>
+
+    <div id="main-container" class="container">
+
+        <div id="view-list" class="view-section active">
+            <div class="control-panel">
+                <div class="control-row list-controls-row">
+                    <button id="btn-mode-list" class="action-btn" onclick="toggleViewMode('list')"><span
+                            data-i18n="mode_card"></span></button>
+                    <button id="btn-mode-matrix" class="action-btn" onclick="toggleViewMode('matrix')"><span
+                            data-i18n="mode_matrix"></span></button>
+                </div>
+
+                <div id="list-mode-controls">
+                    <div class="control-row">
+                        <label data-i18n="lbl_start_char" class="control-label"></label>
+                        <select id="char-select" onchange="renderList()" class="form-select"></select>
+                    </div>
+                </div>
+
+                <div id="matrix-settings" class="hidden">
+                    <div class="control-row matrix-settings-row">
+                        <span class="matrix-settings-hint" data-i18n="hint_matrix_edit"></span>
+                        <span id="active-pair-label" class="active-pair-label"></span>
+
+                        <!-- Read-only Toggle -->
+                        <div class="toggle-switch-wrapper">
+                            <span class="toggle-switch-label" data-i18n="lbl_edit_mode"></span>
+                            <label class="switch">
+                                <input type="checkbox" id="matrix-edit-toggle" onchange="toggleMatrixEdit(this.checked)"
+                                    checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <button class="btn-sm" onclick="resetDefaultChars()" data-i18n="btn_reset_chars"></button>
+                    </div>
+                    <div class="control-row matrix-grade-row">
+                        <button class="btn-grade bg-green" onclick="setMatrixStatus('green')"
+                            data-i18n="fb_good"></button>
+                        <button class="btn-grade bg-yellow" onclick="setMatrixStatus('yellow')"
+                            data-i18n="fb_slow"></button>
+                        <button class="btn-grade bg-red" onclick="setMatrixStatus('red')"
+                            data-i18n="fb_wrong"></button>
+                        <button class="btn-grade bg-gray matrix-grade-offset" onclick="setMatrixStatus('gray')"
+                            data-i18n="btn_hide"></button>
+                    </div>
+                </div>
+
+                <!-- Reset button removed -->
+            </div>
+
+            <div id="grid-area" class="grid-container"></div>
+
+            <div id="matrix-area" class="matrix-wrapper hidden">
+                <table id="full-matrix" class="matrix-table"></table>
+            </div>
+
+            <div id="matrix-footer" class="control-row hidden matrix-footer-shell">
+                <button class="action-btn matrix-footer-button" onclick="resetAllColors()"
+                    data-i18n="btn_reset_color"></button>
+            </div>
+        </div>
+
+        <div id="view-memory" class="view-section">
+            <div class="control-panel">
+                <div class="control-row control-row-wrap">
+                    <div class="dropdown-wrapper range-dropdown">
+                        <label data-i18n="lbl_start"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;"></label>
+                        <button id="mem_start-btn" onclick="toggleDropdown('mem_start')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;"></button>
+                        <div class="dropdown-content" id="mem_start-content">
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_start', true)" style="flex:1;"
+                                    data-i18n="sel_full"></button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_start', false)" style="flex:1;"
+                                    data-i18n="sel_none"></button>
+                            </div>
+                            <div id="mem-start-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-wrapper range-dropdown">
+                        <label data-i18n="lbl_end"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;"></label>
+                        <button id="mem_end-btn" onclick="toggleDropdown('mem_end')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;"></button>
+                        <div class="dropdown-content" id="mem_end-content">
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_end', true)" style="flex:1;"
+                                    data-i18n="sel_full"></button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('mem_end', false)" style="flex:1;"
+                                    data-i18n="sel_none"></button>
+                            </div>
+                            <div id="mem-end-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-area flashcard-card" id="memory-card" onclick="toggleMemoryAnswer()">
+                <div class="question" id="mem-q">FO</div>
+                <div class="answer-text" id="mem-a">...</div>
+
+                <div class="flashcard-subtext" id="mem-hint"
+                    data-i18n="hint_click_flip"></div>
+
+                <div id="mem-grading-area" class="grading-btns hidden">
+                    <button class="grading-btn btn-grade-red" onclick="event.stopPropagation(); markMemStatus('red')">
+                        <span data-i18n="fb_wrong"></span>
+                    </button>
+                    <button class="grading-btn btn-grade-yellow"
+                        onclick="event.stopPropagation(); markMemStatus('yellow')">
+                        <span data-i18n="fb_slow"></span>
+                    </button>
+                    <button class="grading-btn btn-grade-green"
+                        onclick="event.stopPropagation(); markMemStatus('green')">
+                        <span data-i18n="fb_good"></span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="view-trainer" class="view-section">
+            <div class="control-panel">
+                <div class="control-row control-row-wrap">
+                    <div class="dropdown-wrapper range-dropdown">
+                        <label data-i18n="lbl_start"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;"></label>
+                        <button id="trainer_start-btn" onclick="toggleDropdown('trainer_start')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;"></button>
+                        <div class="dropdown-content" id="trainer_start-content">
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_start', true)" style="flex:1;"
+                                    data-i18n="sel_full"></button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_start', false)" style="flex:1;"
+                                    data-i18n="sel_none"></button>
+                            </div>
+                            <div id="trainer-start-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-wrapper range-dropdown">
+                        <label data-i18n="lbl_end"
+                            style="font-weight:500; display:block; text-align:left; margin-bottom:4px;"></label>
+                        <button id="trainer_end-btn" onclick="toggleDropdown('trainer_end')" class="action-btn dropdown-toggle-btn"
+                            style="width:100%; justify-content:space-between; display:inline-flex;"></button>
+                        <div class="dropdown-content" id="trainer_end-content">
+                            <div class="dropdown-toolbar">
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_end', true)" style="flex:1;"
+                                    data-i18n="sel_full"></button>
+                                <button class="btn-sm btn-flex" onclick="toggleAll('trainer_end', false)" style="flex:1;"
+                                    data-i18n="sel_none"></button>
+                            </div>
+                            <div id="trainer-end-range-grid" class="checkbox-grid"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-row control-row-wrap trainer-toolbar">
+                    <div class="trainer-mode-group">
+                        <button id="btn-trainer-type-corner" class="action-btn" onclick="setTrainerAlgorithmType('corner')"
+                            data-i18n="algorithm_corners"></button>
+                        <button id="btn-trainer-type-edge" class="action-btn" onclick="setTrainerAlgorithmType('edge')"
+                            data-i18n="algorithm_edges"></button>
+                    </div>
+                    <div class="trainer-toolbar-actions">
+                        <button class="action-btn" id="trainer-prev-btn" onclick="goToPreviousTrainerScramble()"
+                            data-i18n="btn_prev_scramble"></button>
+                        <button class="action-btn" id="trainer-generate-btn" onclick="goToNextTrainerScramble()"
+                            data-i18n="btn_generate_scramble"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-area-test trainer-card">
+                <div class="trainer-panel">
+                    <div class="trainer-panel-label" data-i18n="trainer_scramble_label"></div>
+                    <div id="trainer-scramble" class="trainer-scramble-text"
+                        data-i18n="trainer_scramble_placeholder"></div>
+                </div>
+                <div class="trainer-timer-shell">
+                    <div id="trainer-timer" class="trainer-timer-display">0.00</div>
+                    <div id="trainer-status" class="trainer-status">Corners</div>
+                </div>
+                <div id="trainer-penalty-shell" class="trainer-penalty-shell hidden">
+                    <div class="trainer-penalty-row trainer-penalty-row-compact">
+                    <button id="trainer-plus2-btn" class="action-btn trainer-action-btn trainer-icon-btn" onclick="toggleTrainerPenalty('plus2')"
+                        data-i18n="btn_penalty_plus2"></button>
+                    <button id="trainer-dnf-btn" class="action-btn trainer-action-btn trainer-icon-btn" onclick="toggleTrainerPenalty('dnf')"
+                        data-i18n="btn_penalty_dnf"></button>
+                    <button id="trainer-delete-btn" class="action-btn trainer-action-btn trainer-delete-btn trainer-icon-btn"
+                        onclick="toggleTrainerDeleteConfirm()"
+                        data-i18n="btn_delete_solve"></button>
+                    <button id="trainer-delete-confirm-btn"
+                        class="action-btn trainer-action-btn trainer-delete-confirm-btn trainer-icon-btn hidden"
+                        onclick="confirmDeleteLatestTrainerRecord()" data-i18n="btn_delete_confirm"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="trainer-averages-shell">
+                <div class="trainer-panel-label" data-i18n="trainer_averages_label"></div>
+                <div class="trainer-averages-grid">
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao5</div>
+                        <div id="trainer-avg-5" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao12</div>
+                        <div id="trainer-avg-12" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao50</div>
+                        <div id="trainer-avg-50" class="trainer-average-value is-empty">--</div>
+                    </div>
+                    <div class="trainer-average-card">
+                        <div class="trainer-average-name">ao100</div>
+                        <div id="trainer-avg-100" class="trainer-average-value is-empty">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="trainer-history-shell">
+                <div class="trainer-panel-label" data-i18n="trainer_history_label"></div>
+                <div id="trainer-history" class="trainer-history-list"></div>
+                <div id="trainer-history-clear-group" class="trainer-history-clear-group">
+                    <button id="trainer-clear-menu-btn" class="action-btn trainer-history-clear-trigger"
+                        onclick="toggleTrainerClearMenu(event)" data-i18n="btn_clear_records"
+                        aria-haspopup="true" aria-expanded="false"></button>
+                    <div id="trainer-clear-menu" class="trainer-history-clear-menu hidden">
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="requestClearTrainerRecords('corner')"
+                            data-i18n="btn_clear_corners_records"></button>
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="requestClearTrainerRecords('edge')"
+                            data-i18n="btn_clear_edges_records"></button>
+                        <button type="button" class="action-btn trainer-history-clear-option"
+                            onclick="setTrainerClearMenuOpen(false)" data-i18n="btn_delete_cancel"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="view-data" class="view-section">
+            <div class="control-panel">
+                <div class="backup-container">
+                    <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="settings_formula_title"></div>
+                        <div class="settings-info-card">
+                            <p class="settings-info-text">
+                                <span data-i18n="settings_formula_prefix"></span><a
+                                    href="https://blddb.net/" target="_blank" rel="noopener noreferrer">BLDDB</a><span
+                                    data-i18n="settings_formula_suffix"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="settings_language_label"></div>
+                        <div class="settings-action-card">
+                            <p class="settings-action-text" data-i18n="settings_language_hint"></p>
+                            <button id="lang-toggle-btn" class="action-btn settings-lang-btn" onclick="toggleLanguage()"
+                                data-i18n="btn_toggle_lang"></button>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="settings_chars_label"></div>
+                        <div class="settings-action-card settings-char-card">
+                            <div class="settings-char-btn-row">
+                                <button id="chars-zh-btn" class="action-btn settings-char-btn" onclick="setCharScheme('zh')"
+                                    data-i18n="btn_chars_zh"></button>
+                                <button id="chars-en-btn" class="action-btn settings-char-btn" onclick="setCharScheme('en')"
+                                    data-i18n="btn_chars_en"></button>
+                                <button id="chars-custom-btn" class="action-btn settings-char-btn" onclick="setCharScheme('custom')"
+                                    data-i18n="btn_chars_custom"></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="title_backup"></div>
+                        <div class="export-controls">
+                            <div class="styled-select-wrapper">
+                                <select id="export-type" class="styled-select">
+                                    <option value="json" data-i18n="opt_json"></option>
+                                    <option value="csv" data-i18n="opt_csv"></option>
+                                </select>
+                                <span class="select-arrow">▼</span>
+                            </div>
+                            <button class="action-btn btn-export" onclick="exportData()">
+                                <span data-i18n="btn_export_exec"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
+                        <div class="export-controls import-controls-row">
+                            <div class="styled-select-wrapper file-input-wrapper">
+                                <input type="file" id="file-input" accept=".json" class="file-input"
+                                    aria-label="Import File">
+                            </div>
+                            <button class="action-btn btn-export" onclick="importData()" data-i18n="btn_import"></button>
+                        </div>
+                    </div>
+
+                    <div class="danger-zone">
+                        <button class="btn-danger action-btn btn-full-danger" onclick="clearAllData()"
+                            data-i18n="btn_clear_all"></button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="main-footer">
+        <div class="social-icons">
+            <a href="https://www.worldcubeassociation.org/persons/2020LINC05" target="_blank"
+                rel="noopener noreferrer" class="icon-link" aria-label="WCA Profile" title="WCA Profile"><svg
+                    viewBox="0 0 24 24">
+                    <path
+                        d="M12.0003 2.50815L2.8374 7.11885L12.0003 12.3331L21.1631 7.11885L12.0003 2.50815ZM1.64209 8.65082V16.892L10.893 22.091V13.8499L1.64209 8.65082ZM13.1075 13.8499V22.091L22.3584 16.892V8.65082L13.1075 13.8499Z" />
+                </svg></a>
+            <a href="https://www.instagram.com/chihjialin/" target="_blank" rel="noopener noreferrer"
+                class="icon-link" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M17.25,5.5A1.25,1.25 0 0,1 18.5,6.75A1.25,1.25 0 0,1 17.25,8A1.25,1.25 0 0,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
+                </svg></a>
+            <a href="https://github.com/CharlesOuO/Blindfolded-Letter-Pairs" target="_blank" rel="noopener noreferrer" class="icon-link"
+                aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z" />
+                </svg></a>
+            <a href="https://mail.google.com/mail/?view=cm&fs=1&to=linchihjia@gmail.com" target="_blank"
+                rel="noopener noreferrer" class="icon-link" aria-label="Email" title="Gmail"><svg viewBox="0 0 24 24">
+                    <path
+                        d="M20,8L12,13L4,8V6L12,11L20,6M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
+                </svg></a>
+        </div>
+        <div class="footer-meta">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
+    </footer>
+
+    <script src="built-in-algorithms.js?v=20260519b"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.min.js"></script>
+    <script src="script.js?v=20260526a"></script>
+</body>
+
+</html>

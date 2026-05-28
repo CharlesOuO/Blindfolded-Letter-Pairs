@@ -3,14 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description"
         content="3BLD(3 style & letter pairs) practice with words, corners, edges, flashcards, typing tests, and local backup.">
     <title data-i18n="page_title"></title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="style.css?v=20260519c">
+    <link rel="stylesheet" href="style.css?v=20260525b">
 </head>
 
 <body class="app-booting" onload="bootApp()">
@@ -219,15 +219,15 @@
                 </div>
                 <div id="trainer-penalty-shell" class="trainer-penalty-shell hidden">
                     <div class="trainer-penalty-row trainer-penalty-row-compact">
-                    <button id="trainer-plus2-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('plus2')"
+                    <button id="trainer-plus2-btn" class="action-btn trainer-action-btn trainer-icon-btn" onclick="toggleTrainerPenalty('plus2')"
                         data-i18n="btn_penalty_plus2"></button>
-                    <button id="trainer-dnf-btn" class="action-btn trainer-action-btn" onclick="toggleTrainerPenalty('dnf')"
+                    <button id="trainer-dnf-btn" class="action-btn trainer-action-btn trainer-icon-btn" onclick="toggleTrainerPenalty('dnf')"
                         data-i18n="btn_penalty_dnf"></button>
-                    <button id="trainer-delete-btn" class="action-btn trainer-action-btn trainer-delete-btn"
+                    <button id="trainer-delete-btn" class="action-btn trainer-action-btn trainer-delete-btn trainer-icon-btn"
                         onclick="toggleTrainerDeleteConfirm()"
                         data-i18n="btn_delete_solve"></button>
                     <button id="trainer-delete-confirm-btn"
-                        class="action-btn trainer-action-btn trainer-delete-confirm-btn hidden"
+                        class="action-btn trainer-action-btn trainer-delete-confirm-btn trainer-icon-btn hidden"
                         onclick="confirmDeleteLatestTrainerRecord()" data-i18n="btn_delete_confirm"></button>
                     </div>
                 </div>
@@ -376,7 +376,7 @@
     <script src="built-in-algorithms.js?v=20260519b"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.min.js"></script>
-    <script src="script.js?v=20260519c"></script>
+    <script src="script.js?v=20260526a"></script>
 </body>
 
 </html>
