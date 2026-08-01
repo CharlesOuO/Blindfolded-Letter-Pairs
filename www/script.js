@@ -126,7 +126,7 @@ const translations = {
         lbl_start_char: "開頭代碼：", btn_reset_color: "重置熟悉度：",
         lbl_range: "選擇範圍：", lbl_test_range: "測驗範圍：", btn_next: "下一題", btn_start_test: "開始測驗 (Space)",
         btn_submit: "提交 (Enter)", ph_input: "輸入後按 Enter",
-        title_settings: "設定", title_backup: "備份", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料",
+        title_settings: "設定", title_backup: "備份", lbl_select_file: "匯入檔案：", btn_import: "確認匯入", btn_clear_all: "清空所有資料", alert_export_failed: "匯出失敗，請再試一次。",
         opt_json: "系統備份檔 (.json)", opt_csv: "Excel 表格 (.csv)", btn_export_exec: "匯出資料",
         hint_matrix_edit: "提示：點擊表頭可修改代碼",
         btn_reset_chars: "回復預設", mode_card: "列表模式", mode_matrix: "表格模式", btn_same: "同",
@@ -147,7 +147,7 @@ const translations = {
         lbl_start_char: "Start Code:", btn_reset_color: "Reset familiarity:",
         lbl_range: "Select Range:", lbl_test_range: "Test Range:", btn_next: "Next", btn_start_test: "Start Test (Space)",
         btn_submit: "Submit (Enter)", ph_input: "Type & Enter",
-        title_settings: "Setting", title_backup: "Backup", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data",
+        title_settings: "Setting", title_backup: "Backup", lbl_select_file: "Import File:", btn_import: "Import", btn_clear_all: "Clear All Data", alert_export_failed: "Export failed. Please try again.",
         opt_json: "Backup File (.json)", opt_csv: "Excel Table (.csv)", btn_export_exec: "Export Data",
         hint_matrix_edit: "Click header to edit code",
         btn_reset_chars: "Reset Default", mode_card: "List Mode", mode_matrix: "Table Mode", btn_same: "Same",
@@ -3238,7 +3238,31 @@ function toggleMemoryAnswer() {
     isMemAnswerShown = true; applyLanguage();
 }
 
-function exportData() {
+async function saveExportFile(content, fileName, mimeType) {
+    const nativeExporter = window.Capacitor?.Plugins?.FileExporter;
+    if (nativeExporter?.exportFile) {
+        try {
+            return await nativeExporter.exportFile({ content, fileName, mimeType });
+        } catch (error) {
+            console.error('Native export failed', error);
+            alert(t('alert_export_failed'));
+            return { saved: false };
+        }
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    return { saved: true };
+}
+
+async function exportData() {
     const exportType = document.getElementById('export-type').value;
     const dict = getDict();
     const cornerFormulaDict = getFormulaDict('corner');
@@ -3260,15 +3284,11 @@ function exportData() {
             csvContent += row.join(",") + "\n";
         });
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `letter_pairs_table_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        await saveExportFile(
+            csvContent,
+            `letter_pairs_table_${new Date().toISOString().slice(0, 10)}.csv`,
+            'text/csv'
+        );
 
     } else {
         const statusMap = getStatusMap();
@@ -3323,13 +3343,11 @@ function exportData() {
             }
         };
 
-        const blob = new Blob([JSON.stringify(backupPayload)], { type: "application/json" });
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        await saveExportFile(
+            JSON.stringify(backupPayload),
+            `backup_${new Date().toISOString().slice(0, 10)}.json`,
+            'application/json'
+        );
     }
 }
 
