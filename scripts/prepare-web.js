@@ -13,10 +13,6 @@ const filesToCopy = [
   "edgeManmade.json"
 ];
 
-if (fs.existsSync(webDir)) {
-  fs.rmSync(webDir, { recursive: true, force: true });
-}
-
 fs.mkdirSync(webDir, { recursive: true });
 
 for (const relPath of filesToCopy) {

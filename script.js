@@ -1613,10 +1613,15 @@ function updateTrainerScrambleNavButtons() {
     prevBtn.disabled = navState.index <= 0;
 }
 
-function formatTrainerPairCaseLabel(pair = '') {
-    if (!pair) return '';
+function normalizeTrainerPairValue(pair = '') {
+    const normalized = String(pair || '').trim();
+    return normalized || '';
+}
 
-    const normalizedPair = String(pair);
+function formatTrainerPairCaseLabel(pair = '') {
+    const normalizedPair = normalizeTrainerPairValue(pair);
+    if (!normalizedPair) return '';
+
     const [startIndex, endIndex] = getPairIndices(normalizedPair);
     if (startIndex === -1 || endIndex === -1) return normalizedPair.toUpperCase();
 
@@ -1637,14 +1642,23 @@ function setTrainerScrambleDisplay(scramble = '', pair = currentTrainerPair) {
         return;
     }
 
-    const caseLabel = formatTrainerPairCaseLabel(pair);
+    let resolvedPair = normalizeTrainerPairValue(pair);
+    if (!resolvedPair) {
+        const navState = getTrainerScrambleNavState();
+        const currentSnapshot = navState.items[navState.index];
+        resolvedPair = normalizeTrainerPairValue(currentSnapshot?.pair || '');
+    }
+
+    const caseLabel = formatTrainerPairCaseLabel(resolvedPair);
     scrambleEl.innerText = caseLabel ? `${scrambleText} (${caseLabel})` : scrambleText;
 }
 
 function applyTrainerScrambleSnapshot(snapshot, options = {}) {
     if (!snapshot || !snapshot.scramble) return false;
 
-    currentTrainerPair = snapshot.pair || null;
+    const snapshotPair = normalizeTrainerPairValue(snapshot.pair || '');
+    if (snapshotPair) currentTrainerPair = snapshotPair;
+    else if (!currentTrainerPair) currentTrainerPair = null;
     currentTrainerScramble = snapshot.scramble;
     currentTrainerAlgorithm = formatTrainerCommutatorText(snapshot.algorithm || '');
 
@@ -1657,7 +1671,9 @@ function applyTrainerScrambleSnapshot(snapshot, options = {}) {
 }
 
 function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAlgorithmType, options = {}) {
-    if (!pair || !scramble) return;
+    const normalizedPair = normalizeTrainerPairValue(pair);
+    const normalizedScramble = String(scramble || '').trim();
+    if (!normalizedPair || !normalizedScramble) return;
 
     const navState = getTrainerScrambleNavState(type);
     if (navState.index < navState.items.length - 1) {
@@ -1665,8 +1681,8 @@ function rememberTrainerScrambleSnapshot(pair, scramble, type = currentTrainerAl
     }
 
     navState.items.push({
-        pair,
-        scramble,
+        pair: normalizedPair,
+        scramble: normalizedScramble,
         algorithm: formatTrainerCommutatorText(options.algorithm || ''),
         algorithmType: normalizeTrainerAlgorithmType(type)
     });
@@ -2514,6 +2530,8 @@ function generateTrainerScramble(options = {}) {
 
     currentTrainerAlgorithm = formatTrainerCommutatorText(pickedAlgorithm?.algorithm || '');
     const nextScramble = scrambleMoves.join(' ');
+    currentTrainerPair = normalizeTrainerPairValue(pair) || null;
+    currentTrainerScramble = nextScramble;
     rememberTrainerScrambleSnapshot(pair, nextScramble, currentTrainerAlgorithmType, {
         algorithm: currentTrainerAlgorithm
     });
@@ -3141,11 +3159,12 @@ function getStudyCandidatePool(mode, contentModes = ['word']) {
     }
 
     const dueCandidates = candidates.filter((candidate) => candidate.dueDate <= now);
-    const activeCandidates = dueCandidates.length > 0 ? dueCandidates : candidates;
-    const earliestDueDate = Math.min(...activeCandidates.map((candidate) => candidate.dueDate));
-    const pool = activeCandidates
-        .filter((candidate) => candidate.dueDate === earliestDueDate)
-        .map((candidate) => candidate.pair);
+    const earliestDueDate = Math.min(...candidates.map((candidate) => candidate.dueDate));
+    const pool = dueCandidates.length > 0
+        ? dueCandidates.map((candidate) => candidate.pair)
+        : candidates
+            .filter((candidate) => candidate.dueDate === earliestDueDate)
+            .map((candidate) => candidate.pair);
 
     return {
         pool,
@@ -3171,19 +3190,27 @@ function nextMemoryCard() {
     }
 
     let pool = result.pool;
-    if (!result.hasDueCandidates && Array.isArray(result.candidates) && recentMemPairs.length > 0) {
+    if (recentMemPairs.length > 0) {
         const recentSet = new Set(recentMemPairs.slice(-MEMORY_REPEAT_GAP));
-        const eligibleCandidates = result.candidates.filter((candidate) => !recentSet.has(candidate.pair));
+        const eligiblePool = pool.filter((pair) => !recentSet.has(pair));
 
-        if (eligibleCandidates.length > 0) {
-            const earliestEligibleDueDate = Math.min(...eligibleCandidates.map((candidate) => candidate.dueDate));
-            pool = eligibleCandidates
-                .filter((candidate) => candidate.dueDate === earliestEligibleDueDate)
-                .map((candidate) => candidate.pair);
+        if (eligiblePool.length > 0) {
+            pool = eligiblePool;
+        } else if (Array.isArray(result.candidates)) {
+            const eligibleCandidates = result.candidates.filter((candidate) => !recentSet.has(candidate.pair));
+            if (eligibleCandidates.length > 0) {
+                const earliestEligibleDueDate = Math.min(...eligibleCandidates.map((candidate) => candidate.dueDate));
+                pool = eligibleCandidates
+                    .filter((candidate) => candidate.dueDate === earliestEligibleDueDate)
+                    .map((candidate) => candidate.pair);
+            }
         }
     }
 
-    if (pool.length > 1 && lastMemPair) pool = pool.filter(p => p !== lastMemPair);
+    if (pool.length > 1 && lastMemPair) {
+        const withoutLastPair = pool.filter((pair) => pair !== lastMemPair);
+        if (withoutLastPair.length > 0) pool = withoutLastPair;
+    }
 
     currentPair = pool[Math.floor(Math.random() * pool.length)];
     lastMemPair = currentPair;

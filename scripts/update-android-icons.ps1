@@ -1,5 +1,9 @@
 param(
-    [string]$SourceImage = ''
+    [string]$SourceImage = '',
+    [ValidateRange(1, 100)]
+    [int]$AdaptiveForegroundPercent = 66,
+    [ValidateRange(1, 100)]
+    [int]$LegacyIconPercent = 88
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,7 +59,8 @@ function Save-ResizedPng {
     param(
         [System.Drawing.Image]$InputImage,
         [int]$Size,
-        [string]$OutputPath
+        [string]$OutputPath,
+        [int]$ContentPercent = 100
     )
 
     $bitmap = New-Object System.Drawing.Bitmap($Size, $Size)
@@ -66,13 +71,24 @@ function Save-ResizedPng {
     $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
     $graphics.Clear([System.Drawing.Color]::Transparent)
 
-    # Keep aspect ratio by center-cropping to a square before resizing.
-    $cropSize = [Math]::Min($InputImage.Width, $InputImage.Height)
-    $srcX = [int][Math]::Floor(($InputImage.Width - $cropSize) / 2)
-    $srcY = [int][Math]::Floor(($InputImage.Height - $cropSize) / 2)
-    $srcRect = New-Object System.Drawing.Rectangle($srcX, $srcY, $cropSize, $cropSize)
-    $dstRect = New-Object System.Drawing.Rectangle(0, 0, $Size, $Size)
-    $graphics.DrawImage($InputImage, $dstRect, $srcRect, [System.Drawing.GraphicsUnit]::Pixel)
+    # Fit the full source image inside the icon canvas with optional padding.
+    # This avoids clipping details (like cube edges) when launcher masks are applied.
+    $contentSize = [Math]::Max(1, [int][Math]::Round($Size * ($ContentPercent / 100.0)))
+    $sourceRatio = [double]$InputImage.Width / [double]$InputImage.Height
+
+    if ($sourceRatio -ge 1.0) {
+        $drawWidth = $contentSize
+        $drawHeight = [Math]::Max(1, [int][Math]::Round($contentSize / $sourceRatio))
+    }
+    else {
+        $drawHeight = $contentSize
+        $drawWidth = [Math]::Max(1, [int][Math]::Round($contentSize * $sourceRatio))
+    }
+
+    $dstX = [int][Math]::Floor(($Size - $drawWidth) / 2)
+    $dstY = [int][Math]::Floor(($Size - $drawHeight) / 2)
+    $dstRect = New-Object System.Drawing.Rectangle($dstX, $dstY, $drawWidth, $drawHeight)
+    $graphics.DrawImage($InputImage, $dstRect)
 
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 
@@ -87,14 +103,14 @@ try {
             New-Item -ItemType Directory -Path $dir | Out-Null
         }
 
-        Save-ResizedPng -InputImage $source -Size $spec.Launcher -OutputPath (Join-Path $dir 'ic_launcher.png')
-        Save-ResizedPng -InputImage $source -Size $spec.Launcher -OutputPath (Join-Path $dir 'ic_launcher_round.png')
-        Save-ResizedPng -InputImage $source -Size $spec.Foreground -OutputPath (Join-Path $dir 'ic_launcher_foreground.png')
-        Save-ResizedPng -InputImage $source -Size $spec.Foreground -OutputPath (Join-Path $dir 'ic_launcher_monochrome.png')
+        Save-ResizedPng -InputImage $source -Size $spec.Launcher -OutputPath (Join-Path $dir 'ic_launcher.png') -ContentPercent $LegacyIconPercent
+        Save-ResizedPng -InputImage $source -Size $spec.Launcher -OutputPath (Join-Path $dir 'ic_launcher_round.png') -ContentPercent $LegacyIconPercent
+        Save-ResizedPng -InputImage $source -Size $spec.Foreground -OutputPath (Join-Path $dir 'ic_launcher_foreground.png') -ContentPercent $AdaptiveForegroundPercent
+        Save-ResizedPng -InputImage $source -Size $spec.Foreground -OutputPath (Join-Path $dir 'ic_launcher_monochrome.png') -ContentPercent $AdaptiveForegroundPercent
     }
 }
 finally {
     $source.Dispose()
 }
 
-Write-Output "Updated Android launcher icons from $sourcePath"
+Write-Output "Updated Android launcher icons from $sourcePath (adaptive=$AdaptiveForegroundPercent%, legacy=$LegacyIconPercent%)"
