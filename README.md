@@ -30,7 +30,8 @@ It is a fully static website with no backend required.
 - Default lettering scheme: `Speffz`
 - Built-in algorithm source: [BLDDB](https://blddb.net/)
 - Built-in algorithm format: `commutator-first`
-- Default built-in buffer mapping: Speffz `C` buffer
+- Default corner and edge buffers: Speffz `C`
+- Corner and edge buffer stickers can be selected separately in Settings; placeholders update automatically
 - Built-in corner and edge references are stored locally in this project
 
 `Speffz` is only the default.
@@ -124,6 +125,7 @@ Backup data includes:
 - all user data is stored in browser `localStorage`
 - clearing browser site data will remove local progress if you do not have a backup
 - built-in algorithm defaults are loaded from `built-in-algorithms.js`
+- selected corner and edge buffers are included in JSON backups
 
 ## Troubleshooting
 

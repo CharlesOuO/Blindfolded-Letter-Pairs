@@ -10,6 +10,8 @@ const CORNER_FORMULA_STORAGE_KEY = 'bld_formula_corner_dict_v1';
 const EDGE_FORMULA_STORAGE_KEY = 'bld_formula_edge_dict_v1';
 const CORNER_FORMULA_STATUS_KEY = 'bld_formula_corner_status_v1';
 const EDGE_FORMULA_STATUS_KEY = 'bld_formula_edge_status_v1';
+const CORNER_BUFFER_STORAGE_KEY = 'bld_corner_buffer_index_v1';
+const EDGE_BUFFER_STORAGE_KEY = 'bld_edge_buffer_index_v1';
 const LANG_KEY = 'bld_lang_v1';
 const CHARS_KEY = 'bld_chars_v1';
 const CUSTOM_CHARS_KEY = 'bld_custom_chars_v1';
@@ -23,6 +25,8 @@ const APP_STORAGE_KEYS = [
     EDGE_FORMULA_STORAGE_KEY,
     CORNER_FORMULA_STATUS_KEY,
     EDGE_FORMULA_STATUS_KEY,
+    CORNER_BUFFER_STORAGE_KEY,
+    EDGE_BUFFER_STORAGE_KEY,
     LANG_KEY,
     CHARS_KEY,
     CUSTOM_CHARS_KEY,
@@ -39,6 +43,7 @@ let currentListViewMode = 'list';
 let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
 let currentTrainerAlgorithmType = 'corner';
+let currentAlgorithmBufferIndices = { corner: 2, edge: 2 };
 let currentTrainerPair = null;
 let currentTrainerScramble = '';
 let currentTrainerAlgorithm = '';
@@ -228,6 +233,12 @@ Object.assign(translations['zh-TW'], {
     btn_toggle_lang: "English / \u4e2d\u6587",
     settings_chars_label: "\u7de8\u78bc\u7cfb\u7d71",
     settings_chars_hint: "\u53ef\u7368\u7acb\u9078\u64c7\u6ce8\u97f3\uff08\u3105~\u3129\uff09\u3001\u82f1\u6587\uff08a~x\uff09\u6216\u81ea\u8a02\uff1b\u5207\u63db\u5230\u82f1\u6587\u4e0d\u6703\u8986\u84cb\u4f60\u7684\u81ea\u8a02\u3002",
+    settings_buffer_label: "Buffer \u8a2d\u5b9a",
+    settings_buffer_hint: "\u5206\u5225\u9078\u64c7\u89d2\u584a\u8207\u908a\u584a\u7684 buffer sticker\uff1b\u5167\u5efa placeholder \u6703\u7acb\u5373\u6539\u7528\u5c0d\u61c9\u7684 BLDDB \u516c\u5f0f\u3002",
+    settings_corner_buffer: "\u89d2\u584a Buffer",
+    settings_edge_buffer: "\u908a\u584a Buffer",
+    settings_buffer_option: "{letter}\uff08Speffz {speffz}\uff09",
+    settings_formula_suffix: "\uff0c\u4e26\u4f9d\u4e0b\u65b9\u9078\u64c7\u7684 buffer \u986f\u793a placeholder\u3002",
     btn_chars_zh: "\u6ce8\u97f3 \u3105~\u3129",
     btn_chars_en: "English a~x",
     btn_chars_custom: "\u81ea\u8a02",
@@ -298,6 +309,12 @@ Object.assign(translations.en, {
     btn_toggle_lang: "\u4e2d\u6587 / English",
     settings_chars_label: "Lettering System",
     settings_chars_hint: "Choose Zhuyin (\u3105~\u3129), English (a~x), or Custom. Switching to English won't erase your custom scheme.",
+    settings_buffer_label: "Buffer Settings",
+    settings_buffer_hint: "Choose the corner and edge buffer stickers separately. Built-in placeholders update immediately to the matching BLDDB algorithms.",
+    settings_corner_buffer: "Corner Buffer",
+    settings_edge_buffer: "Edge Buffer",
+    settings_buffer_option: "{letter} (Speffz {speffz})",
+    settings_formula_suffix: " and show placeholders for the buffers selected below.",
     btn_chars_zh: "Zhuyin \u3105~\u3129",
     btn_chars_en: "English a~x",
     btn_chars_custom: "Custom",
@@ -479,6 +496,19 @@ function sanitizeTrainerRecords(value) {
     }).filter(Boolean);
 }
 
+function sanitizeAlgorithmBufferSettings(value) {
+    if (!isPlainObject(value)) return null;
+
+    const result = {};
+    for (const type of ['corner', 'edge']) {
+        if (value[type] == null) continue;
+        const index = Number(value[type]);
+        if (!Number.isInteger(index) || index < 0 || index >= 24) return null;
+        result[type] = index;
+    }
+    return Object.keys(result).length > 0 ? result : null;
+}
+
 function normalizeBackupPayload(value) {
     if (!isPlainObject(value)) throw new Error('Invalid backup payload');
 
@@ -497,6 +527,7 @@ function normalizeBackupPayload(value) {
     const rawTrainerRecords = trainerSection.records ?? value.trainerRecords;
     const rawChars = settingsSection.chars ?? value.chars;
     const rawLang = settingsSection.lang ?? value.lang;
+    const rawAlgorithmBuffers = settingsSection.algorithmBuffers ?? value.algorithmBuffers;
 
     const knownKeys = [
         rawDict,
@@ -507,7 +538,8 @@ function normalizeBackupPayload(value) {
         rawEdgeFormulaStatus,
         rawTrainerRecords,
         rawChars,
-        rawLang
+        rawLang,
+        rawAlgorithmBuffers
     ];
     const hasKnownKey = knownKeys.some((sectionValue) => sectionValue != null);
     if (!hasKnownKey) throw new Error('Unknown backup format');
@@ -516,6 +548,8 @@ function normalizeBackupPayload(value) {
     if (rawChars != null && !normalizedChars) throw new Error('Invalid chars');
 
     const normalizedLang = rawLang === 'zh-TW' || rawLang === 'en' ? rawLang : null;
+    const normalizedAlgorithmBuffers = rawAlgorithmBuffers == null ? null : sanitizeAlgorithmBufferSettings(rawAlgorithmBuffers);
+    if (rawAlgorithmBuffers != null && !normalizedAlgorithmBuffers) throw new Error('Invalid algorithm buffers');
 
     return {
         dict: sanitizeStringMap(rawDict),
@@ -526,7 +560,8 @@ function normalizeBackupPayload(value) {
         edgeFormulaStatus: sanitizeStatusMap(rawEdgeFormulaStatus),
         trainerRecords: sanitizeTrainerRecords(rawTrainerRecords),
         chars: normalizedChars,
-        lang: normalizedLang
+        lang: normalizedLang,
+        algorithmBuffers: normalizedAlgorithmBuffers
     };
 }
 
@@ -623,6 +658,7 @@ function init() {
     if (savedChars) chars = savedChars;
     if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
     trainerRecords = getTrainerRecords();
+    loadAlgorithmBufferSettings();
     syncLatestTrainerRecordId();
     resetTrainerScrambleNavigation();
     migrateLegacyFormulaData();
@@ -783,6 +819,7 @@ function initUI() {
     updateDropdownLabel('mem_end');
     updateDropdownLabel('trainer_start');
     updateDropdownLabel('trainer_end');
+    renderAlgorithmBufferSettings();
 }
 
 function setupDynamicUI() {
@@ -1028,6 +1065,82 @@ function getContentLabelKey(mode) {
     return 'content_word_label';
 }
 
+function normalizeAlgorithmBufferIndex(value, fallback = 2) {
+    const index = Number(value);
+    return Number.isInteger(index) && index >= 0 && index < chars.length ? index : fallback;
+}
+
+function getAlgorithmBufferStorageKey(contentMode = 'corner') {
+    return contentMode === 'edge' ? EDGE_BUFFER_STORAGE_KEY : CORNER_BUFFER_STORAGE_KEY;
+}
+
+function loadAlgorithmBufferSettings() {
+    currentAlgorithmBufferIndices = {
+        corner: normalizeAlgorithmBufferIndex(readStoredJson(CORNER_BUFFER_STORAGE_KEY, 2)),
+        edge: normalizeAlgorithmBufferIndex(readStoredJson(EDGE_BUFFER_STORAGE_KEY, 2))
+    };
+}
+
+function getAlgorithmBufferIndex(contentMode = 'corner') {
+    const type = contentMode === 'edge' ? 'edge' : 'corner';
+    return normalizeAlgorithmBufferIndex(currentAlgorithmBufferIndices[type]);
+}
+
+function renderAlgorithmBufferSettings() {
+    ['corner', 'edge'].forEach((type) => {
+        const select = document.getElementById(`${type}-buffer-select`);
+        if (!select) return;
+
+        const selectedIndex = getAlgorithmBufferIndex(type);
+        select.innerHTML = '';
+        chars.forEach((letter, index) => {
+            const option = document.createElement('option');
+            option.value = String(index);
+            option.innerText = t('settings_buffer_option', {
+                letter: String(letter).toUpperCase(),
+                speffz: String.fromCharCode(65 + index)
+            });
+            option.selected = index === selectedIndex;
+            select.appendChild(option);
+        });
+    });
+}
+
+function setAlgorithmBuffer(contentMode, value) {
+    const type = contentMode === 'edge' ? 'edge' : 'corner';
+    const nextIndex = normalizeAlgorithmBufferIndex(value, getAlgorithmBufferIndex(type));
+    currentAlgorithmBufferIndices[type] = nextIndex;
+    localStorage.setItem(getAlgorithmBufferStorageKey(type), JSON.stringify(nextIndex));
+    renderAlgorithmBufferSettings();
+    renderCurrentListView();
+
+    trainerScrambleNavigation[type] = { items: [], index: -1 };
+    trainerAlgorithmDrawState[type] = {};
+    trainerPairDrawState[type] = { signature: '', total: 0, drawOrder: [] };
+    if (currentTrainerAlgorithmType === type) {
+        currentTrainerPair = null;
+        currentTrainerAlgorithm = '';
+        generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+    }
+}
+
+function getBuiltInCaseVariants(contentMode, bufferIndex, startIndex, endIndex) {
+    const orientationCodes = BUILT_IN_ALGORITHMS.orientationCodes?.[contentMode];
+    if (!Array.isArray(orientationCodes)) return [];
+
+    const variants = [];
+    orientationCodes.forEach((codes) => {
+        if (typeof codes !== 'string' || codes.length < chars.length) return;
+        const caseCode = `${codes[bufferIndex]}${codes[startIndex]}${codes[endIndex]}`;
+        variants.push(
+            caseCode,
+            `${caseCode.slice(1)}${caseCode[0]}`,
+            `${caseCode[2]}${caseCode.slice(0, 2)}`
+        );
+    });
+    return variants;
+}
+
 function getBuiltInAlgorithmMap(contentMode = 'corner') {
     return isAlgorithmContentMode(contentMode) ? (BUILT_IN_ALGORITHMS[contentMode] || {}) : {};
 }
@@ -1056,9 +1169,23 @@ function getBuiltInAlgorithm(pair, contentMode = 'corner') {
     const [startIndex, endIndex] = getPairIndices(pair);
     if (startIndex === -1 || endIndex === -1) return '';
 
-    const value = getBuiltInAlgorithmMap(contentMode)[`${startIndex}-${endIndex}`] || '';
-    if (/^not found\.?$/i.test(String(value).trim())) return '';
-    return value;
+    const algorithmMap = getBuiltInAlgorithmMap(contentMode);
+    const orientationCodes = BUILT_IN_ALGORITHMS.orientationCodes?.[contentMode];
+
+    // Backward compatibility for older generated data.
+    if (!Array.isArray(orientationCodes)) {
+        const legacyValue = algorithmMap[`${startIndex}-${endIndex}`] || '';
+        return /^not found\.?$/i.test(String(legacyValue).trim()) ? '' : legacyValue;
+    }
+
+    const bufferIndex = getAlgorithmBufferIndex(contentMode);
+    const caseCodes = getBuiltInCaseVariants(contentMode, bufferIndex, startIndex, endIndex);
+    for (const caseCode of caseCodes) {
+        const value = String(algorithmMap[caseCode] || '').trim();
+        if (value && !/^not found\.?$/i.test(value)) return value;
+    }
+
+    return '';
 }
 
 function getAlgorithmPlaceholder(pair, contentMode = 'corner') {
@@ -2929,6 +3056,7 @@ function applyLanguage() {
     updateMemoryContentModeButtons();
     updateTrainerAlgorithmButtons();
     updateCharSchemeButtons();
+    renderAlgorithmBufferSettings();
     updateTrainerTypeBadge();
     setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
     setTrainerStatus(currentTrainerStatusKey);
@@ -3338,7 +3466,11 @@ async function exportData() {
                 },
                 settings: {
                     chars: chars,
-                    lang: currentLang
+                    lang: currentLang,
+                    algorithmBuffers: {
+                        corner: getAlgorithmBufferIndex('corner'),
+                        edge: getAlgorithmBufferIndex('edge')
+                    }
                 }
             }
         };
@@ -3382,6 +3514,16 @@ function importData() {
             if (normalizedData.lang) {
                 currentLang = normalizedData.lang;
                 localStorage.setItem(LANG_KEY, currentLang);
+            }
+
+            if (normalizedData.algorithmBuffers) {
+                for (const type of ['corner', 'edge']) {
+                    if (normalizedData.algorithmBuffers[type] == null) continue;
+                    const index = normalizedData.algorithmBuffers[type];
+                    currentAlgorithmBufferIndices[type] = index;
+                    localStorage.setItem(getAlgorithmBufferStorageKey(type), JSON.stringify(index));
+                }
+                resetTrainerScrambleNavigation();
             }
 
             fileInput.value = '';

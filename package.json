@@ -5,6 +5,7 @@
     "main": ".tmp_i18n_check.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
+        "generate:algorithms": "node scripts/generate-built-in-algorithms.js",
         "prepare:web": "node scripts/prepare-web.js",
         "cap:copy": "npm run prepare:web && npx cap copy",
         "cap:sync": "npm run prepare:web && npx cap sync",

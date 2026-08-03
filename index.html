@@ -10,7 +10,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="style.css?v=20260525b">
+    <link rel="stylesheet" href="style.css?v=20260803a">
 </head>
 
 <body class="app-booting" onload="bootApp()">
@@ -288,6 +288,31 @@
                     </div>
 
                     <div class="backup-group">
+                        <div class="backup-group-label" data-i18n="settings_buffer_label"></div>
+                        <div class="settings-action-card settings-buffer-card">
+                            <p class="settings-action-text" data-i18n="settings_buffer_hint"></p>
+                            <div class="settings-buffer-grid">
+                                <label class="settings-buffer-field" for="corner-buffer-select">
+                                    <span data-i18n="settings_corner_buffer"></span>
+                                    <span class="styled-select-wrapper">
+                                        <select id="corner-buffer-select" class="styled-select"
+                                            onchange="setAlgorithmBuffer('corner', this.value)"></select>
+                                        <span class="select-arrow" aria-hidden="true">&#9662;</span>
+                                    </span>
+                                </label>
+                                <label class="settings-buffer-field" for="edge-buffer-select">
+                                    <span data-i18n="settings_edge_buffer"></span>
+                                    <span class="styled-select-wrapper">
+                                        <select id="edge-buffer-select" class="styled-select"
+                                            onchange="setAlgorithmBuffer('edge', this.value)"></select>
+                                        <span class="select-arrow" aria-hidden="true">&#9662;</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="backup-group">
                         <div class="backup-group-label" data-i18n="settings_language_label"></div>
                         <div class="settings-action-card">
                             <p class="settings-action-text" data-i18n="settings_language_hint"></p>
@@ -373,10 +398,10 @@
         <div class="footer-meta">&copy; 2026 Charles Lin. WCA ID: 2020LINC05</div>
     </footer>
 
-    <script src="built-in-algorithms.js?v=20260519b"></script>
+    <script src="built-in-algorithms.js?v=20260803a"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.min.js"></script>
-    <script src="script.js?v=20260530a"></script>
+    <script src="script.js?v=20260803a"></script>
 </body>
 
 </html>

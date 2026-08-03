@@ -1048,6 +1048,36 @@ body.app-booting {
     min-height: 46px;
 }
 
+.settings-buffer-card {
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.settings-buffer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.settings-buffer-field {
+    display: grid;
+    gap: 7px;
+    color: #334155;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.settings-buffer-field .styled-select-wrapper,
+.settings-buffer-field .styled-select {
+    width: 100%;
+}
+
+@media (max-width: 640px) {
+    .settings-buffer-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* 匯出區塊 */
 .export-controls {
     display: grid;
