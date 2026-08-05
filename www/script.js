@@ -2,6 +2,27 @@ const CHARS_ZH = ['ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ', 'ㄍ',
 const CHARS_EN = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x'];
 let chars = [...CHARS_ZH];
 
+// Sticker names in Speffz index order. Buffer settings must stay independent
+// from the user's lettering scheme, while preserving the existing stored index.
+const BUFFER_STICKER_NAMES = Object.freeze({
+    corner: Object.freeze([
+        'ULB', 'UBR', 'URF', 'UFL',
+        'LBU', 'LUF', 'LFD', 'LDB',
+        'FLU', 'FUR', 'FRD', 'FDL',
+        'RFU', 'RUB', 'RBD', 'RDF',
+        'BRU', 'BUL', 'BLD', 'BDR',
+        'DLF', 'DFR', 'DRB', 'DBL'
+    ]),
+    edge: Object.freeze([
+        'UB', 'UR', 'UF', 'UL',
+        'LU', 'LF', 'LD', 'LB',
+        'FU', 'FR', 'FD', 'FL',
+        'RU', 'RB', 'RD', 'RF',
+        'BU', 'BL', 'BD', 'BR',
+        'DF', 'DR', 'DB', 'DL'
+    ])
+});
+
 const STORAGE_KEY = 'bld_custom_dict_v3';
 const STATUS_KEY = 'bld_status_v1';
 const LEGACY_FORMULA_STORAGE_KEY = 'bld_formula_dict_v1';
@@ -234,10 +255,10 @@ Object.assign(translations['zh-TW'], {
     settings_chars_label: "\u7de8\u78bc\u7cfb\u7d71",
     settings_chars_hint: "\u53ef\u7368\u7acb\u9078\u64c7\u6ce8\u97f3\uff08\u3105~\u3129\uff09\u3001\u82f1\u6587\uff08a~x\uff09\u6216\u81ea\u8a02\uff1b\u5207\u63db\u5230\u82f1\u6587\u4e0d\u6703\u8986\u84cb\u4f60\u7684\u81ea\u8a02\u3002",
     settings_buffer_label: "Buffer \u8a2d\u5b9a",
-    settings_buffer_hint: "\u5206\u5225\u9078\u64c7\u89d2\u584a\u8207\u908a\u584a\u7684 buffer sticker\uff1b\u5167\u5efa placeholder \u6703\u7acb\u5373\u6539\u7528\u5c0d\u61c9\u7684 BLDDB \u516c\u5f0f\u3002",
+    settings_buffer_hint: "\u4f7f\u7528 URF / UF \u7b49 sticker \u4f4d\u7f6e\u5206\u5225\u9078\u64c7\u89d2\u584a\u8207\u908a\u584a buffer\uff1b\u5167\u5efa placeholder \u6703\u7acb\u5373\u6539\u7528\u5c0d\u61c9\u7684 BLDDB \u516c\u5f0f\u3002",
     settings_corner_buffer: "\u89d2\u584a Buffer",
     settings_edge_buffer: "\u908a\u584a Buffer",
-    settings_buffer_option: "{letter}\uff08Speffz {speffz}\uff09",
+    settings_buffer_option: "{sticker}",
     settings_formula_suffix: "\uff0c\u4e26\u4f9d\u4e0b\u65b9\u9078\u64c7\u7684 buffer \u986f\u793a placeholder\u3002",
     btn_chars_zh: "\u6ce8\u97f3 \u3105~\u3129",
     btn_chars_en: "English a~x",
@@ -310,10 +331,10 @@ Object.assign(translations.en, {
     settings_chars_label: "Lettering System",
     settings_chars_hint: "Choose Zhuyin (\u3105~\u3129), English (a~x), or Custom. Switching to English won't erase your custom scheme.",
     settings_buffer_label: "Buffer Settings",
-    settings_buffer_hint: "Choose the corner and edge buffer stickers separately. Built-in placeholders update immediately to the matching BLDDB algorithms.",
+    settings_buffer_hint: "Choose corner and edge buffers by sticker position (such as URF or UF). Built-in placeholders update immediately to the matching BLDDB algorithms.",
     settings_corner_buffer: "Corner Buffer",
     settings_edge_buffer: "Edge Buffer",
-    settings_buffer_option: "{letter} (Speffz {speffz})",
+    settings_buffer_option: "{sticker}",
     settings_formula_suffix: " and show placeholders for the buffers selected below.",
     btn_chars_zh: "Zhuyin \u3105~\u3129",
     btn_chars_en: "English a~x",
@@ -1093,13 +1114,10 @@ function renderAlgorithmBufferSettings() {
 
         const selectedIndex = getAlgorithmBufferIndex(type);
         select.innerHTML = '';
-        chars.forEach((letter, index) => {
+        BUFFER_STICKER_NAMES[type].forEach((sticker, index) => {
             const option = document.createElement('option');
             option.value = String(index);
-            option.innerText = t('settings_buffer_option', {
-                letter: String(letter).toUpperCase(),
-                speffz: String.fromCharCode(65 + index)
-            });
+            option.innerText = t('settings_buffer_option', { sticker });
             option.selected = index === selectedIndex;
             select.appendChild(option);
         });
