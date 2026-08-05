@@ -9,6 +9,8 @@ const filesToCopy = [
   "style.css",
   "script.js",
   "built-in-algorithms.js",
+  "manifest.webmanifest",
+  "service-worker.js",
   "cornerManmade.json",
   "edgeManmade.json"
 ];
@@ -26,4 +28,17 @@ for (const relPath of filesToCopy) {
   fs.copyFileSync(sourcePath, targetPath);
 }
 
-console.log(`Prepared ${filesToCopy.length} files into ${webDir}`);
+const dirsToCopy = ["icons"];
+
+for (const relPath of dirsToCopy) {
+  const sourcePath = path.join(projectRoot, relPath);
+  const targetPath = path.join(webDir, relPath);
+
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error("Missing required directory: " + relPath);
+  }
+
+  fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+}
+
+console.log("Prepared " + filesToCopy.length + " files and " + dirsToCopy.length + " directories into " + webDir);

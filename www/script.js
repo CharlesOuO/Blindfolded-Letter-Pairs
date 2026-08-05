@@ -82,6 +82,8 @@ let trainerClearMenuOpen = false;
 let trainerCubeSolverInitState = 'unknown';
 let trainerTouchTapState = null;
 let trainerTouchSuppressClickUntil = 0;
+let deferredPwaInstallPrompt = null;
+let pwaSetupCompleted = false;
 let trainerScrambleNavigation = {
     corner: { items: [], index: -1 },
     edge: { items: [], index: -1 }
@@ -264,6 +266,12 @@ Object.assign(translations['zh-TW'], {
     btn_chars_en: "English a~x",
     btn_chars_custom: "\u81ea\u8a02",
     page_title: "3BLD 3-Style Letter Pairs \u7df4\u7fd2",
+    settings_install_label: "\u5b89\u88dd App",
+    settings_install_hint: "\u5c07\u9019\u500b\u7df4\u7fd2\u5de5\u5177\u5b89\u88dd\u5230\u4e3b\u756b\u9762\uff0c\u4e4b\u5f8c\u53ef\u4ee5\u50cf App \u4e00\u6a23\u7368\u7acb\u958b\u555f\u3002",
+    settings_install_button: "\u5b89\u88dd App",
+    settings_install_ios_hint: "iPhone / iPad \u8acb\u9ede\u700f\u89bd\u5668\u7684\u5206\u4eab\u6309\u9215\uff0c\u518d\u9078\u300c\u52a0\u5165\u4e3b\u756b\u9762\u300d\u3002",
+    settings_install_ios_button: "\u67e5\u770b\u5b89\u88dd\u65b9\u5f0f",
+    settings_install_ios_instructions: "\u8acb\u9ede\u700f\u89bd\u5668\u7684\u5206\u4eab\u6309\u9215\uff0c\u5f80\u4e0b\u627e\u5230\u4e26\u9078\u64c7\u300c\u52a0\u5165\u4e3b\u756b\u9762\u300d\u3002",
     sel_prefix: "\u5df2\u9078\uff1a"
 });
 
@@ -339,6 +347,12 @@ Object.assign(translations.en, {
     btn_chars_zh: "Zhuyin \u3105~\u3129",
     btn_chars_en: "English a~x",
     btn_chars_custom: "Custom",
+    settings_install_label: "Install App",
+    settings_install_hint: "Install this trainer on your device and launch it later in its own app window.",
+    settings_install_button: "Install App",
+    settings_install_ios_hint: "On iPhone or iPad, open the browser Share menu and choose Add to Home Screen.",
+    settings_install_ios_button: "Installation Help",
+    settings_install_ios_instructions: "Open the browser Share menu, scroll down, and choose Add to Home Screen.",
     page_title: "3BLD(3 style & letter pairs) practice"
 });
 
@@ -680,6 +694,7 @@ function init() {
     if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
     trainerRecords = getTrainerRecords();
     loadAlgorithmBufferSettings();
+    setupPwa();
     syncLatestTrainerRecordId();
     resetTrainerScrambleNavigation();
     migrateLegacyFormulaData();
@@ -713,6 +728,91 @@ function bootApp() {
             completeBootTransition();
         }
     }
+}
+
+function isPwaStandalone() {
+    return window.matchMedia?.('(display-mode: standalone)').matches === true
+        || window.navigator.standalone === true;
+}
+
+function isIosDevice() {
+    const userAgent = window.navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(userAgent)
+        || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+}
+
+function isNativeAppContext() {
+    try {
+        return window.Capacitor?.isNativePlatform?.() === true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function updatePwaInstallUi() {
+    const group = document.getElementById('pwa-install-group');
+    const button = document.getElementById('pwa-install-btn');
+    const hint = document.getElementById('pwa-install-hint');
+    if (!group || !button || !hint) return;
+
+    if (isNativeAppContext() || isPwaStandalone()) {
+        group.classList.add('hidden');
+        return;
+    }
+
+    const showIosInstructions = isIosDevice();
+    const canPromptInstall = !!deferredPwaInstallPrompt;
+    group.classList.toggle('hidden', !showIosInstructions && !canPromptInstall);
+
+    const hintKey = showIosInstructions ? 'settings_install_ios_hint' : 'settings_install_hint';
+    const buttonKey = showIosInstructions ? 'settings_install_ios_button' : 'settings_install_button';
+    hint.setAttribute('data-i18n', hintKey);
+    button.setAttribute('data-i18n', buttonKey);
+    hint.innerText = t(hintKey);
+    button.innerText = t(buttonKey);
+}
+
+async function requestPwaInstall() {
+    if (deferredPwaInstallPrompt) {
+        const installPrompt = deferredPwaInstallPrompt;
+        deferredPwaInstallPrompt = null;
+        await installPrompt.prompt();
+
+        try {
+            await installPrompt.userChoice;
+        } finally {
+            updatePwaInstallUi();
+        }
+        return;
+    }
+
+    if (isIosDevice()) {
+        alert(t('settings_install_ios_instructions'));
+    }
+}
+
+function setupPwa() {
+    if (pwaSetupCompleted || typeof window === 'undefined') return;
+    pwaSetupCompleted = true;
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredPwaInstallPrompt = event;
+        updatePwaInstallUi();
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPwaInstallPrompt = null;
+        updatePwaInstallUi();
+    });
+
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+        navigator.serviceWorker.register('./service-worker.js').catch((error) => {
+            console.warn('Service worker registration failed:', error);
+        });
+    }
+
+    updatePwaInstallUi();
 }
 
 function setupEventListeners() {
@@ -3080,6 +3180,7 @@ function applyLanguage() {
     setTrainerStatus(currentTrainerStatusKey);
     renderTrainerRecords();
     toggleViewMode(currentListViewMode);
+    updatePwaInstallUi();
 }
 
 function setMemoryCardFlipped(isFlipped) {

@@ -1033,6 +1033,17 @@ body.app-booting {
     white-space: nowrap;
 }
 
+.settings-install-card {
+    border-color: #bfdbfe;
+    background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+}
+
+.settings-install-btn {
+    flex-shrink: 0;
+    min-width: 132px;
+    white-space: nowrap;
+}
+
 .settings-char-btn-row {
     width: 100%;
     display: grid;
@@ -1413,7 +1424,8 @@ input:checked+.slider:before {
         align-items: stretch;
     }
 
-    .settings-lang-btn {
+    .settings-lang-btn,
+    .settings-install-btn {
         width: 100%;
     }
 

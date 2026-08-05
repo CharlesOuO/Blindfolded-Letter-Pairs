@@ -6,6 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description"
         content="3BLD(3 style & letter pairs) practice with words, corners, edges, flashcards, typing tests, and local backup.">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="3BLD Pairs">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title data-i18n="page_title"></title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -309,6 +316,15 @@
                                     </span>
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <div id="pwa-install-group" class="backup-group hidden">
+                        <div class="backup-group-label" data-i18n="settings_install_label"></div>
+                        <div class="settings-action-card settings-install-card">
+                            <p id="pwa-install-hint" class="settings-action-text" data-i18n="settings_install_hint"></p>
+                            <button id="pwa-install-btn" type="button" class="action-btn settings-install-btn"
+                                onclick="requestPwaInstall()" data-i18n="settings_install_button"></button>
                         </div>
                     </div>
 
