@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "3BLD 3-Style Letter Pairs",
-  "short_name": "3BLD Pairs",
+  "name": "3BLD",
+  "short_name": "3BLD",
   "description": "Practice 3BLD letter pairs, 3-style algorithms, flashcards, and recall training.",
   "lang": "zh-TW",
   "start_url": "./",
@@ -9,7 +9,7 @@
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f8fafc",
-  "theme_color": "#2563eb",
+  "theme_color": "#f8fafc",
   "categories": [
     "education",
     "productivity",
