@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bld-letter-pairs-v3';
+const CACHE_NAME = 'bld-letter-pairs-v4';
 const APP_SHELL = [
     './',
     './index.html',
