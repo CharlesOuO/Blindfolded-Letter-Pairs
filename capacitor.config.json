@@ -1,8 +1,0 @@
-﻿{
-  "appId": "io.github.charlesouo.blindfoldedletterpairs",
-  "appName": "Blindfolded Letter Pairs",
-  "webDir": "www",
-  "server": {
-    "androidScheme": "https"
-  }
-}

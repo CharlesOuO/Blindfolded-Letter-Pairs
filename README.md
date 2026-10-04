@@ -25,6 +25,8 @@ You can use it to:
 
 It is a fully static website with no backend required.
 
+The app is distributed as a website/PWA. Install it through your browser for standalone and offline use; no native Android project or APK is maintained. Keep a separate JSON backup of your words and progress.
+
 ## Default Setup
 
 - Default lettering scheme: `Speffz`
@@ -186,6 +188,8 @@ This project is licensed under `GPL-3.0-or-later`.
 - 匯出與匯入自己的本機資料
 
 這是一個純靜態網站，不需要後端。
+
+目前以網頁／PWA 形式提供，可透過瀏覽器安裝並離線使用，不再維護原生 Android 專案或 APK。字詞與進度請另外匯出 JSON 備份。
 
 ## 預設設定
 

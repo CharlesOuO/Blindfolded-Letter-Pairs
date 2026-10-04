@@ -1,10 +1,10 @@
-const CACHE_NAME = 'bld-letter-pairs-v4';
+const CACHE_NAME = 'bld-letter-pairs-v5';
 const APP_SHELL = [
     './',
     './index.html',
-    './style.css?v=20260803a',
-    './built-in-algorithms.js?v=20260803a',
-    './script.js?v=20260803a',
+    './style.css?v=20261005a',
+    './built-in-algorithms.js?v=20261005a',
+    './script.js?v=20261005a',
     './manifest.webmanifest',
     './icons/icon-192.png',
     './icons/icon-512.png',

@@ -25,6 +25,8 @@ const BUFFER_STICKER_NAMES = Object.freeze({
 
 const STORAGE_KEY = 'bld_custom_dict_v3';
 const STATUS_KEY = 'bld_status_v1';
+const EDGE_WORD_STORAGE_KEY = 'bld_word_edge_dict_v1';
+const EDGE_WORD_STATUS_KEY = 'bld_word_edge_status_v1';
 const LEGACY_FORMULA_STORAGE_KEY = 'bld_formula_dict_v1';
 const LEGACY_FORMULA_STATUS_KEY = 'bld_formula_status_v1';
 const CORNER_FORMULA_STORAGE_KEY = 'bld_formula_corner_dict_v1';
@@ -39,6 +41,8 @@ const CUSTOM_CHARS_KEY = 'bld_custom_chars_v1';
 const TRAINER_RECORDS_KEY = 'bld_trainer_records_v1';
 const APP_STORAGE_KEYS = [
     STORAGE_KEY,
+    EDGE_WORD_STORAGE_KEY,
+    EDGE_WORD_STATUS_KEY,
     STATUS_KEY,
     LEGACY_FORMULA_STORAGE_KEY,
     LEGACY_FORMULA_STATUS_KEY,
@@ -63,6 +67,8 @@ let isMatrixMode = false;
 let currentListViewMode = 'list';
 let currentAlgorithmType = 'corner';
 let currentMemoryContentModes = ['word'];
+let currentMemoryPieceType = 'corner';
+let currentTrainerContentGroup = 'formula';
 let currentTrainerAlgorithmType = 'corner';
 let currentAlgorithmBufferIndices = { corner: 2, edge: 2 };
 let currentTrainerPair = null;
@@ -205,7 +211,7 @@ Object.assign(translations['zh-TW'], {
     switch_matrix: "\u8868\u683c",
     switch_words: "\u5b57\u8a5e",
     switch_algorithm: "\u516c\u5f0f",
-    algorithm_type: "\u516c\u5f0f\u985e\u578b",
+    algorithm_type: "部位",
     algorithm_corners: "角塊",
     algorithm_edges: "邊塊",
     content_word_label: "\u5b57\u8a5e",
@@ -287,7 +293,7 @@ Object.assign(translations.en, {
     switch_matrix: "Table",
     switch_words: "Words",
     switch_algorithm: "Algorithm",
-    algorithm_type: "Algorithm Type",
+    algorithm_type: "Piece Type",
     algorithm_corners: "Corners",
     algorithm_edges: "Edges",
     content_word_label: "Word",
@@ -369,12 +375,14 @@ function isAlgorithmContentMode(contentMode = 'word') {
 function getContentStorageKey(contentMode = 'word') {
     if (contentMode === 'corner') return CORNER_FORMULA_STORAGE_KEY;
     if (contentMode === 'edge') return EDGE_FORMULA_STORAGE_KEY;
+    if (contentMode === 'edge-word') return EDGE_WORD_STORAGE_KEY;
     return STORAGE_KEY;
 }
 
 function getStatusStorageKey(contentMode = 'word') {
     if (contentMode === 'corner') return CORNER_FORMULA_STATUS_KEY;
     if (contentMode === 'edge') return EDGE_FORMULA_STATUS_KEY;
+    if (contentMode === 'edge-word') return EDGE_WORD_STATUS_KEY;
     return STATUS_KEY;
 }
 
@@ -442,8 +450,8 @@ function getDict() { return readStoredJson(STORAGE_KEY, {}); }
 function saveDict(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
 function getFormulaDict(formulaType = 'corner') { return readStoredJson(getContentStorageKey(formulaType), {}); }
 function saveFormulaDict(formulaType = 'corner', dict) { localStorage.setItem(getContentStorageKey(formulaType), JSON.stringify(dict)); }
-function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : getDict(); }
-function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : saveDict(dict); }
+function getContentDict(contentMode = 'word') { return isAlgorithmContentMode(contentMode) ? getFormulaDict(contentMode) : readStoredJson(getContentStorageKey(contentMode), {}); }
+function saveContentDict(contentMode = 'word', dict) { return isAlgorithmContentMode(contentMode) ? saveFormulaDict(contentMode, dict) : localStorage.setItem(getContentStorageKey(contentMode), JSON.stringify(dict)); }
 
 function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -565,6 +573,8 @@ function normalizeBackupPayload(value) {
     const rawAlgorithmBuffers = settingsSection.algorithmBuffers ?? value.algorithmBuffers;
 
     const knownKeys = [
+        letterPairsSection.edgeWord ?? value.edgeWordDict,
+        statusSection.edgeWord ?? value.edgeWordStatus,
         rawDict,
         rawCornerFormulaDict,
         rawEdgeFormulaDict,
@@ -588,6 +598,8 @@ function normalizeBackupPayload(value) {
 
     return {
         dict: sanitizeStringMap(rawDict),
+        edgeWordDict: sanitizeStringMap(letterPairsSection.edgeWord ?? value.edgeWordDict),
+        edgeWordStatus: sanitizeStatusMap(statusSection.edgeWord ?? value.edgeWordStatus),
         cornerFormulaDict: sanitizeStringMap(rawCornerFormulaDict),
         edgeFormulaDict: sanitizeStringMap(rawEdgeFormulaDict),
         status: sanitizeStatusMap(rawStatus),
@@ -741,21 +753,13 @@ function isIosDevice() {
         || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
 }
 
-function isNativeAppContext() {
-    try {
-        return window.Capacitor?.isNativePlatform?.() === true;
-    } catch (error) {
-        return false;
-    }
-}
-
 function updatePwaInstallUi() {
     const group = document.getElementById('pwa-install-group');
     const button = document.getElementById('pwa-install-btn');
     const hint = document.getElementById('pwa-install-hint');
     if (!group || !button || !hint) return;
 
-    if (isNativeAppContext() || isPwaStandalone()) {
+    if (isPwaStandalone()) {
         group.classList.add('hidden');
         return;
     }
@@ -1082,9 +1086,14 @@ function setupDynamicUI() {
         edgeButton.setAttribute('data-i18n', 'study_edge_mode');
         edgeButton.innerText = t('study_edge_mode');
 
-        leftGroup.appendChild(wordButton);
-        leftGroup.appendChild(cornerButton);
-        rightGroup.appendChild(edgeButton);
+        const formulaButton = document.createElement('button');
+        formulaButton.id = 'btn-mem-content-formula';
+        formulaButton.className = 'action-btn';
+        formulaButton.onclick = () => toggleMemoryContentMode('formula');
+        formulaButton.setAttribute('data-i18n', 'switch_algorithm');
+        formulaButton.innerText = t('switch_algorithm');
+        leftGroup.append(wordButton, formulaButton);
+        rightGroup.append(cornerButton, edgeButton);
 
         modeRow.appendChild(leftGroup);
         modeRow.appendChild(rightGroup);
@@ -1167,7 +1176,7 @@ function normalizeContentModes(contentModes = ['word']) {
 }
 
 function getSelectedMemoryContentModes() {
-    return normalizeContentModes(currentMemoryContentModes);
+    return normalizeContentModes(currentMemoryContentModes).map(mode => mode === 'word' ? (currentMemoryPieceType === 'edge' ? 'edge-word' : 'word') : currentMemoryPieceType);
 }
 
 function getMemoryStatusTargetModes(contentModes = ['word']) {
@@ -1564,7 +1573,7 @@ function getCurrentListContentGroup(mode = currentListViewMode) {
 }
 
 function getCurrentListContentMode(mode = currentListViewMode) {
-    return isFormulaListView(mode) ? currentAlgorithmType : 'word';
+    return isFormulaListView(mode) ? currentAlgorithmType : (currentAlgorithmType === 'edge' ? 'edge-word' : 'word');
 }
 
 function getCurrentListLayoutMode(mode = currentListViewMode) {
@@ -1598,12 +1607,15 @@ function renderCurrentListView() {
 }
 
 function updateMemoryContentModeButtons() {
-    setActionButtonActive(document.getElementById('btn-mem-content-word'), isMemoryContentModeActive('word'));
-    setActionButtonActive(document.getElementById('btn-mem-content-corner'), isMemoryContentModeActive('corner'));
-    setActionButtonActive(document.getElementById('btn-mem-content-edge'), isMemoryContentModeActive('edge'));
+    setActionButtonActive(document.getElementById('btn-mem-content-word'), currentMemoryContentModes.includes('word'));
+    setActionButtonActive(document.getElementById('btn-mem-content-formula'), currentMemoryContentModes.includes('formula'));
+    setActionButtonActive(document.getElementById('btn-mem-content-corner'), currentMemoryPieceType === 'corner');
+    setActionButtonActive(document.getElementById('btn-mem-content-edge'), currentMemoryPieceType === 'edge');
 }
 
 function updateTrainerAlgorithmButtons() {
+    setActionButtonActive(document.getElementById('btn-trainer-content-word'), currentTrainerContentGroup === 'word');
+    setActionButtonActive(document.getElementById('btn-trainer-content-formula'), currentTrainerContentGroup === 'formula');
     setActionButtonActive(document.getElementById('btn-trainer-type-corner'), currentTrainerAlgorithmType === 'corner');
     setActionButtonActive(document.getElementById('btn-trainer-type-edge'), currentTrainerAlgorithmType === 'edge');
 }
@@ -1623,23 +1635,19 @@ function updateAlgorithmTypeButtons() {
 }
 
 function toggleMemoryContentMode(mode) {
-    const selectedModes = getSelectedMemoryContentModes();
-    const isEdgeMode = mode === 'edge';
-    const hasEdgeMode = selectedModes.includes('edge');
-
-    if (isEdgeMode) {
-        currentMemoryContentModes = hasEdgeMode && selectedModes.length === 1 ? selectedModes : ['edge'];
-    } else if (selectedModes.includes(mode)) {
-        const nonEdgeModes = selectedModes.filter((item) => item !== 'edge');
-        if (nonEdgeModes.length === 1) return;
-        currentMemoryContentModes = nonEdgeModes.filter((item) => item !== mode);
-    } else {
-        const baseModes = hasEdgeMode ? [] : selectedModes.filter((item) => item !== 'edge');
-        currentMemoryContentModes = [...baseModes, mode];
-    }
-
+    if (mode === 'corner' || mode === 'edge') currentMemoryPieceType = mode;
+    else if (currentMemoryContentModes.includes(mode)) {
+        if (currentMemoryContentModes.length === 1) return;
+        currentMemoryContentModes = currentMemoryContentModes.filter(item => item !== mode);
+    } else currentMemoryContentModes.push(mode);
     updateMemoryContentModeButtons();
     nextMemoryCard();
+}
+
+function setTrainerContentGroup(group) {
+    currentTrainerContentGroup = group === 'word' ? 'word' : 'formula';
+    updateTrainerAlgorithmButtons();
+    setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
 }
 
 function setTrainerAlgorithmType(type) {
@@ -1895,7 +1903,9 @@ function setTrainerScrambleDisplay(scramble = '', pair = currentTrainerPair) {
     }
 
     const caseLabel = formatTrainerPairCaseLabel(resolvedPair);
-    scrambleEl.innerText = caseLabel ? `${scrambleText} (${caseLabel})` : scrambleText;
+    const wordMode = currentTrainerAlgorithmType === 'edge' ? 'edge-word' : 'word';
+    const cue = currentTrainerContentGroup === 'word' ? getPairContentValue(resolvedPair, wordMode) : '';
+    scrambleEl.innerText = caseLabel ? `${scrambleText} (${caseLabel}${cue ? ': ' + cue : ''})` : scrambleText;
 }
 
 function applyTrainerScrambleSnapshot(snapshot, options = {}) {
@@ -2813,7 +2823,7 @@ function toggleViewMode(mode) {
     updateAlgorithmTypeButtons();
 
     if (algorithmTypeSwitcher) {
-        algorithmTypeSwitcher.classList.toggle('hidden', currentContentGroup !== 'formula');
+        algorithmTypeSwitcher.classList.remove('hidden');
     }
 
     if (isMatrixListView(mode)) {
@@ -2852,7 +2862,8 @@ function toggleViewMode(mode) {
 function renderList() {
     const startChar = document.getElementById('char-select').value;
     const container = document.getElementById('grid-area');
-    const dict = getDict();
+    const contentMode = getCurrentListContentMode();
+    const dict = getContentDict(contentMode);
     container.innerHTML = '';
     const fragment = document.createDocumentFragment();
 
@@ -2865,8 +2876,9 @@ function renderList() {
         const input = document.createElement('input');
         input.className = 'pair-input';
         input.dataset.pair = pair;
+        input.dataset.store = contentMode;
 
-        const stColor = getPairColor(pair);
+        const stColor = getPairColor(pair, contentMode);
         if (stColor) input.classList.add(`status-${stColor}`);
         input.value = dict[pair] || "";
 
@@ -3031,9 +3043,7 @@ window.setMatrixStatus = function (statusType) {
         }
 
         saveStatusData(pair, newData, contentMode);
-        if (statusType === 'gray' && contentMode === 'word') {
-            saveStatusData(pair, newData, 'corner');
-        }
+
 
         // 更新畫面颜色
         const inputEl = document.querySelector(`.matrix-input[data-pair="${pair}"]`);
@@ -3486,17 +3496,6 @@ function toggleMemoryAnswer() {
 }
 
 async function saveExportFile(content, fileName, mimeType) {
-    const nativeExporter = window.Capacitor?.Plugins?.FileExporter;
-    if (nativeExporter?.exportFile) {
-        try {
-            return await nativeExporter.exportFile({ content, fileName, mimeType });
-        } catch (error) {
-            console.error('Native export failed', error);
-            alert(t('alert_export_failed'));
-            return { saved: false };
-        }
-    }
-
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -3511,7 +3510,9 @@ async function saveExportFile(content, fileName, mimeType) {
 
 async function exportData() {
     const exportType = document.getElementById('export-type').value;
-    const dict = getDict();
+    const dict = exportType === 'csv' ? getContentDict(currentAlgorithmType === 'edge' ? 'edge-word' : 'word') : getDict();
+    const edgeWordDict = getContentDict('edge-word');
+    const edgeWordStatus = getStatusMap('edge-word');
     const cornerFormulaDict = getFormulaDict('corner');
     const edgeFormulaDict = getFormulaDict('edge');
 
@@ -3567,16 +3568,18 @@ async function exportData() {
         });
 
         const backupPayload = {
-            version: 2,
+            version: 3,
             exportedAt: new Date().toISOString(),
             sections: {
                 letterPairs: {
                     word: cleanDict,
+                    edgeWord: edgeWordDict,
                     corner: cleanCornerFormulaDict,
                     edge: cleanEdgeFormulaDict
                 },
                 status: {
                     word: cleanStatus,
+                    edgeWord: edgeWordStatus,
                     corner: cleanCornerFormulaStatus,
                     edge: cleanEdgeFormulaStatus
                 },
@@ -3611,6 +3614,8 @@ function importData() {
             const normalizedData = normalizeBackupPayload(parsedData);
 
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData.dict));
+            localStorage.setItem(EDGE_WORD_STORAGE_KEY, JSON.stringify(normalizedData.edgeWordDict));
+            localStorage.setItem(EDGE_WORD_STATUS_KEY, JSON.stringify(normalizedData.edgeWordStatus));
             localStorage.setItem(CORNER_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.cornerFormulaDict));
             localStorage.setItem(EDGE_FORMULA_STORAGE_KEY, JSON.stringify(normalizedData.edgeFormulaDict));
             localStorage.setItem(STATUS_KEY, JSON.stringify(normalizedData.status));
