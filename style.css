@@ -3462,3 +3462,10 @@ body::after {
         scroll-behavior: auto !important;
     }
 }
+/* Editable six-face lettering net; sticker inputs keep their physical positions. */
+.lettering-net-editor { margin: 16px 0; padding: 16px; border: 1px solid var(--border-color, #64748b); border-radius: 12px; }
+.lettering-cube-net { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); max-width: 600px; margin: 20px auto; gap: 3px; }
+.lettering-cube-face { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); aspect-ratio: 1; border: 1px solid #1e293b; }
+.lettering-sticker, .lettering-cube-center { width: 100%; min-width: 0; height: 100%; padding: 0; border: 1px solid #1e293b; border-radius: 0; box-sizing: border-box; background: transparent; color: #111827; text-align: center; font-size: clamp(12px, 3vw, 24px); font-weight: 600; }
+.lettering-cube-center { display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.lettering-sticker:focus { background: #ffffffb0; outline: 3px solid #4f46e5; outline-offset: -3px; }

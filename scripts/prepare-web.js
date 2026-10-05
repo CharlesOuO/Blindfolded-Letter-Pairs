@@ -8,6 +8,7 @@ const filesToCopy = [
   "index.html",
   "style.css",
   "script.js",
+  "lettering.js",
   "built-in-algorithms.js",
   "manifest.webmanifest",
   "service-worker.js",

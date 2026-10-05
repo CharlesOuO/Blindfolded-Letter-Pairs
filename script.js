@@ -55,6 +55,7 @@ const APP_STORAGE_KEYS = [
     LANG_KEY,
     CHARS_KEY,
     CUSTOM_CHARS_KEY,
+    LETTERING_KEY,
     TRAINER_RECORDS_KEY
 ];
 
@@ -128,10 +129,21 @@ let bootTransitionCompleted = false;
 // --- 優化工具: 防抖函數 (Debounce) ---
 const debounce = (fn, delay = 500) => {
     let timeoutId;
-    return (...args) => {
+    let pendingArgs;
+    const invoke = () => {
         clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => fn.apply(this, args), delay);
+        if (!pendingArgs) return;
+        const args = pendingArgs;
+        pendingArgs = null;
+        fn(...args);
     };
+    const debounced = (...args) => {
+        clearTimeout(timeoutId);
+        pendingArgs = args;
+        timeoutId = setTimeout(invoke, delay);
+    };
+    debounced.flush = invoke;
+    return debounced;
 };
 
 const savePairDataDebounced = debounce((pair, value, contentMode = 'word') => {
@@ -573,6 +585,7 @@ function normalizeBackupPayload(value) {
     const rawAlgorithmBuffers = settingsSection.algorithmBuffers ?? value.algorithmBuffers;
 
     const knownKeys = [
+        settingsSection.lettering,
         letterPairsSection.edgeWord ?? value.edgeWordDict,
         statusSection.edgeWord ?? value.edgeWordStatus,
         rawDict,
@@ -589,6 +602,7 @@ function normalizeBackupPayload(value) {
     const hasKnownKey = knownKeys.some((sectionValue) => sectionValue != null);
     if (!hasKnownKey) throw new Error('Unknown backup format');
 
+    if (settingsSection.lettering != null && !sanitizeLetteringState(settingsSection.lettering)) throw new Error('Invalid lettering');
     const normalizedChars = rawChars == null ? null : sanitizeChars(rawChars);
     if (rawChars != null && !normalizedChars) throw new Error('Invalid chars');
 
@@ -606,6 +620,7 @@ function normalizeBackupPayload(value) {
         cornerFormulaStatus: sanitizeStatusMap(rawCornerFormulaStatus),
         edgeFormulaStatus: sanitizeStatusMap(rawEdgeFormulaStatus),
         trainerRecords: sanitizeTrainerRecords(rawTrainerRecords),
+        lettering: settingsSection.lettering == null ? null : sanitizeLetteringState(settingsSection.lettering),
         chars: normalizedChars,
         lang: normalizedLang,
         algorithmBuffers: normalizedAlgorithmBuffers
@@ -704,6 +719,8 @@ function init() {
     const savedChars = sanitizeChars(readStoredJson(CHARS_KEY, null));
     if (savedChars) chars = savedChars;
     if (getCurrentCharScheme() === 'custom') saveCustomChars(chars);
+    ensureLetteringState();
+    chars = [...getPieceChars()];
     trainerRecords = getTrainerRecords();
     loadAlgorithmBufferSettings();
     setupPwa();
@@ -928,6 +945,7 @@ function updateLayoutMode() {
 }
 
 function initUI() {
+    const chars = getPieceChars(currentAlgorithmType);
     const listSel = document.getElementById('char-select');
     if (!listSel) return;
 
@@ -1272,7 +1290,8 @@ function getBuiltInAlgorithmMap(contentMode = 'corner') {
     return isAlgorithmContentMode(contentMode) ? (BUILT_IN_ALGORITHMS[contentMode] || {}) : {};
 }
 
-function getPairIndices(pair) {
+function getPairIndices(pair, type = 'corner') {
+    const chars = getPieceChars(type);
     for (let startIndex = 0; startIndex < chars.length; startIndex++) {
         const startLabel = chars[startIndex];
         if (!pair.startsWith(startLabel)) continue;
@@ -1285,15 +1304,15 @@ function getPairIndices(pair) {
     return [-1, -1];
 }
 
-function isSameCharPair(pair) {
-    const [startIndex, endIndex] = getPairIndices(pair);
+function isSameCharPair(pair, type = 'corner') {
+    const [startIndex, endIndex] = getPairIndices(pair, type);
     return startIndex !== -1 && startIndex === endIndex;
 }
 
 function getBuiltInAlgorithm(pair, contentMode = 'corner') {
     if (!isAlgorithmContentMode(contentMode)) return '';
 
-    const [startIndex, endIndex] = getPairIndices(pair);
+    const [startIndex, endIndex] = getPairIndices(pair, contentMode);
     if (startIndex === -1 || endIndex === -1) return '';
 
     const algorithmMap = getBuiltInAlgorithmMap(contentMode);
@@ -1332,7 +1351,7 @@ function getPairContentValue(pair, contentMode, options = {}) {
         const builtInValue = options.includeBuiltIn === false ? '' : getBuiltInAlgorithm(pair, contentMode);
         if (builtInValue) return builtInValue;
 
-        if (options.includePlaceholder && !isSameCharPair(pair)) {
+        if (options.includePlaceholder && !isSameCharPair(pair, contentMode)) {
             return getAlgorithmPlaceholder(pair, contentMode);
         }
     }
@@ -1597,6 +1616,7 @@ function setListContentMode(contentGroup) {
 
 function setAlgorithmType(type) {
     currentAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    initUI();
     toggleViewMode(currentListViewMode);
 }
 
@@ -1640,6 +1660,9 @@ function toggleMemoryContentMode(mode) {
         if (currentMemoryContentModes.length === 1) return;
         currentMemoryContentModes = currentMemoryContentModes.filter(item => item !== mode);
     } else currentMemoryContentModes.push(mode);
+    renderCheckboxes('mem-start-range-grid', 'mem_start');
+    renderCheckboxes('mem-end-range-grid', 'mem_end');
+    updateDropdownLabel('mem_start'); updateDropdownLabel('mem_end');
     updateMemoryContentModeButtons();
     nextMemoryCard();
 }
@@ -1652,6 +1675,9 @@ function setTrainerContentGroup(group) {
 
 function setTrainerAlgorithmType(type) {
     currentTrainerAlgorithmType = type === 'edge' ? 'edge' : 'corner';
+    renderCheckboxes('trainer-start-range-grid', 'trainer_start');
+    renderCheckboxes('trainer-end-range-grid', 'trainer_end');
+    updateDropdownLabel('trainer_start'); updateDropdownLabel('trainer_end');
     currentTrainerAlgorithm = '';
     clearTrainerInlineStates();
     updateTrainerAlgorithmButtons();
@@ -1662,6 +1688,7 @@ function setTrainerAlgorithmType(type) {
 }
 
 function getTrainerCandidatePairs() {
+    const chars = getPieceChars(currentTrainerAlgorithmType);
     const startChars = getSelectedRanges('trainer_start');
     const endChars = getSelectedRanges('trainer_end');
 
@@ -1872,10 +1899,11 @@ function normalizeTrainerPairValue(pair = '') {
 }
 
 function formatTrainerPairCaseLabel(pair = '') {
+    const chars = getPieceChars(currentTrainerAlgorithmType);
     const normalizedPair = normalizeTrainerPairValue(pair);
     if (!normalizedPair) return '';
 
-    const [startIndex, endIndex] = getPairIndices(normalizedPair);
+    const [startIndex, endIndex] = getPairIndices(normalizedPair, currentTrainerAlgorithmType);
     if (startIndex === -1 || endIndex === -1) return normalizedPair.toUpperCase();
 
     const startLabel = chars[startIndex];
@@ -2860,6 +2888,7 @@ function toggleViewMode(mode) {
 }
 
 function renderList() {
+    const chars = getPieceChars(currentAlgorithmType);
     const startChar = document.getElementById('char-select').value;
     const container = document.getElementById('grid-area');
     const contentMode = getCurrentListContentMode();
@@ -2889,6 +2918,7 @@ function renderList() {
 }
 
 function renderFormulaList() {
+    const chars = getPieceChars(currentAlgorithmType);
     const startChar = document.getElementById('char-select').value;
     const container = document.getElementById('formula-area');
     const contentMode = getCurrentListContentMode();
@@ -2922,6 +2952,7 @@ function renderFormulaList() {
 }
 
 function renderMatrix(contentMode = 'word') {
+    const chars = getPieceChars(contentMode);
     const table = document.getElementById('full-matrix');
     const matrixWrapper = document.getElementById('matrix-area');
     const dict = getContentDict(contentMode);
@@ -3072,14 +3103,16 @@ window.setMatrixStatus = function (statusType) {
     }
 };
 
-window.updateGlobalChar = function (index, newValue) {
-    const val = newValue.trim(); if (!val) { alert(t('alert_chars_empty')); return; }
-    chars[index] = val; localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
-    localStorage.setItem(CUSTOM_CHARS_KEY, JSON.stringify(chars));
-    document.querySelectorAll(`.char-idx-${index}`).forEach(inp => inp.value = val);
-    updateCharSchemeButtons();
-    initUI(); updateLayoutMode(); renderCurrentListView();
-}
+window.updateGlobalChar = function(index, newValue) {
+    const type = currentAlgorithmType;
+    const state = ensureLetteringState();
+    const next = [...state.active[type]];
+    next[index] = newValue.trim().toLowerCase();
+    if (!validateLetteringScheme(next)) { alert(letteringText('請填入不重複的單字元。', 'Use a unique single character.')); renderCurrentListView(); return; }
+    state.custom = { corner: [...state.active.corner], edge: [...state.active.edge] };
+    state.custom[type] = next;
+    applyLetteringScheme('custom');
+};
 
 window.toggleMatrixEdit = function (editable) {
     document.querySelectorAll('.matrix-input').forEach(inp => inp.readOnly = !editable);
@@ -3093,6 +3126,7 @@ function isSameCharScheme(candidate = [], reference = []) {
 }
 
 function getCurrentCharScheme() {
+    if (letteringState) return letteringState.selected;
     if (isSameCharScheme(chars, CHARS_EN)) return 'en';
     if (isSameCharScheme(chars, CHARS_ZH)) return 'zh';
     return 'custom';
@@ -3118,47 +3152,13 @@ function updateCharSchemeButtons() {
 }
 
 function setCharScheme(scheme = 'zh') {
-    const nextScheme = scheme === 'en' ? 'en' : (scheme === 'custom' ? 'custom' : 'zh');
-    const currentScheme = getCurrentCharScheme();
-
-    if (currentScheme === 'custom') {
-        saveCustomChars(chars);
-    }
-
-    if (nextScheme === 'en') {
-        chars = [...CHARS_EN];
-    } else if (nextScheme === 'zh') {
-        chars = [...CHARS_ZH];
-    } else {
-        const savedCustom = getSavedCustomChars();
-        if (savedCustom) chars = [...savedCustom];
-        else saveCustomChars(chars);
-    }
-
-    localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
-
-    initUI();
-    applyLanguage();
-    updateLayoutMode();
-    renderCurrentListView();
-    generateTrainerScramble({ silent: true, resetTimerDisplay: true });
+    applyLetteringScheme(['en', 'custom'].includes(scheme) ? scheme : 'zh');
 }
 
 function resetDefaultChars() {
-    if (confirm(t('alert_reset'))) {
-        const currentScheme = getCurrentCharScheme();
-        if (currentScheme === 'en') chars = [...CHARS_EN];
-        else if (currentScheme === 'zh') chars = [...CHARS_ZH];
-        else chars = (currentLang === 'en') ? [...CHARS_EN] : [...CHARS_ZH];
-
-        localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
-        initUI();
-        applyLanguage();
-        updateLayoutMode();
-        renderCurrentListView();
-        alert(t('alert_reset_done'));
-    }
+    if (confirm(t('alert_reset'))) applyLetteringScheme(currentLang === 'en' ? 'en' : 'zh');
 }
+
 function toggleLanguage() {
     currentLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
     localStorage.setItem(LANG_KEY, currentLang);
@@ -3167,6 +3167,7 @@ function toggleLanguage() {
     renderCurrentListView();
 }
 function applyLanguage() {
+    const chars = getPieceChars(currentAlgorithmType);
     document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (translations[currentLang][key]) el.innerText = translations[currentLang][key]; });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); if (translations[currentLang][key]) el.placeholder = translations[currentLang][key]; });
     document.documentElement.lang = currentLang === 'zh-TW' ? 'zh-TW' : 'en';
@@ -3184,6 +3185,7 @@ function applyLanguage() {
     updateMemoryContentModeButtons();
     updateTrainerAlgorithmButtons();
     updateCharSchemeButtons();
+    renderLetteringNet();
     renderAlgorithmBufferSettings();
     updateTrainerTypeBadge();
     setTrainerScrambleDisplay(currentTrainerScramble, currentTrainerPair);
@@ -3258,6 +3260,7 @@ function updateDropdownLabel(key) {
 }
 
 function renderCheckboxes(containerId, inputName) {
+    const chars = getPieceChars(inputName.startsWith('trainer') ? currentTrainerAlgorithmType : currentMemoryPieceType);
     const container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = '';
@@ -3383,6 +3386,7 @@ function getPairDueDate(pair, contentModes = ['word']) {
 }
 
 function getStudyCandidatePool(mode, contentModes = ['word']) {
+    const chars = getPieceChars(mode === 'mem' ? currentMemoryPieceType : 'corner');
     const startChars = getSelectedRanges(`${mode}_start`);
     const endChars = getSelectedRanges(`${mode}_end`);
     const normalizedModes = normalizeContentModes(contentModes);
@@ -3510,6 +3514,7 @@ async function saveExportFile(content, fileName, mimeType) {
 
 async function exportData() {
     const exportType = document.getElementById('export-type').value;
+    const chars = getPieceChars(currentAlgorithmType);
     const dict = exportType === 'csv' ? getContentDict(currentAlgorithmType === 'edge' ? 'edge-word' : 'word') : getDict();
     const edgeWordDict = getContentDict('edge-word');
     const edgeWordStatus = getStatusMap('edge-word');
@@ -3572,22 +3577,23 @@ async function exportData() {
             exportedAt: new Date().toISOString(),
             sections: {
                 letterPairs: {
-                    word: cleanDict,
+                    word: dict,
                     edgeWord: edgeWordDict,
-                    corner: cleanCornerFormulaDict,
-                    edge: cleanEdgeFormulaDict
+                    corner: cornerFormulaDict,
+                    edge: edgeFormulaDict
                 },
                 status: {
-                    word: cleanStatus,
+                    word: statusMap,
                     edgeWord: edgeWordStatus,
-                    corner: cleanCornerFormulaStatus,
-                    edge: cleanEdgeFormulaStatus
+                    corner: cornerFormulaStatusMap,
+                    edge: edgeFormulaStatusMap
                 },
                 trainer: {
                     records: trainerRecords
                 },
                 settings: {
-                    chars: chars,
+                    chars: getPieceChars(),
+                    lettering: ensureLetteringState(),
                     lang: currentLang,
                     algorithmBuffers: {
                         corner: getAlgorithmBufferIndex('corner'),
@@ -3629,6 +3635,8 @@ function importData() {
             trainerHistoryDeleteConfirmRecordId = null;
             resetTrainerScrambleNavigation();
 
+            letteringState = normalizedData.lettering;
+            if (letteringState) { saveLetteringState(); } else { localStorage.removeItem(LETTERING_KEY); }
             if (normalizedData.chars) {
                 chars = normalizedData.chars;
                 localStorage.setItem(CHARS_KEY, JSON.stringify(chars));
@@ -3652,6 +3660,7 @@ function importData() {
 
             fileInput.value = '';
             alert(t('alert_import_success'));
+            ensureLetteringState();
             initUI();
             applyLanguage();
             updateLayoutMode();

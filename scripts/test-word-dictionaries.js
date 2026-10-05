@@ -11,6 +11,7 @@ const context = vm.createContext({
     },
     setTimeout, clearTimeout
 });
+vm.runInContext(fs.readFileSync('lettering.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('script.js', 'utf8'), context);
 const run = code => vm.runInContext(code, context);
 assert.equal(run("getPairContentValue('ab', 'word')"), 'corner word');
@@ -39,4 +40,16 @@ run("currentTrainerAlgorithmType = 'corner'; setTrainerScrambleDisplay('R U', 'a
 assert.match(display.innerText, /corner word/);
 run('clearAppStorageData()');
 assert.equal(stored.has('bld_word_edge_dict_v1'), false);
-console.log('Word dictionary checks passed.');
+
+run('letteringState = null; chars = [...CHARS_EN]; ensureLetteringState()');
+assert.equal(run("validateLetteringScheme(Array(24).fill('a'))"), null);
+assert.equal(run("validateLetteringScheme(CHARS_EN).length"), 24);
+run("saveContentDict('word', {ab:'corner'}); saveContentDict('edge-word', {ab:'edge'}); saveStatusData('ab', {color:'green'}, 'edge-word')");
+run("const reversed = [...CHARS_EN].reverse(); remapLetteringData('edge', getPieceChars('edge'), reversed); letteringState.active.edge = reversed; letteringState.custom.edge = [...reversed]; letteringState.selected = 'custom'; saveLetteringState()");
+assert.equal(run("getPairContentValue('xw','edge-word')"), 'edge');
+assert.equal(run("getPairContentValue('ab','word')"), 'corner');
+assert.equal(run("getPairColor('xw','edge-word')"), 'green');
+assert.equal(run("JSON.stringify(getPairIndices('xw', 'edge'))"), '[0,1]');
+assert.equal(run("JSON.stringify(getPairIndices('ab', 'corner'))"), '[0,1]');
+assert.equal(run("normalizeBackupPayload({sections:{settings:{lettering:ensureLetteringState()}}}).lettering.active.edge[0]"), 'x');
+console.log('Word dictionary and independent lettering checks passed.');
